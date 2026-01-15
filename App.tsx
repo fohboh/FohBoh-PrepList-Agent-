@@ -14,7 +14,7 @@ import {
 import { PrepItem, InventoryItem, WasteEntry, MenuItem, SpecialEvent, DaypartConfig, WasteReasonCode, WasteCategory } from './types';
 import { GoogleGenAI, LiveServerMessage, Modality } from '@google/genai';
 
-// Audio Utility Functions
+// Audio Utility Functions (Manual Base64 and PCM handling)
 function decode(base64: string) {
   const binaryString = atob(base64);
   const bytes = new Uint8Array(binaryString.length);
@@ -70,7 +70,8 @@ const App: React.FC = () => {
   });
 
   const [specialEvents, setSpecialEvents] = useState<SpecialEvent[]>([
-    { id: 'e1', name: 'Downtown Farmers Market', coverIncrease: 1.15, menuFocus: 'Breakfast' }
+    { id: 'e1', name: 'Downtown Farmers Market', coverIncrease: 1.15, menuFocus: 'Breakfast' },
+    { id: 'e2', name: 'Marathon Sunday', coverIncrease: 1.40, menuFocus: 'Carb Loading' }
   ]);
 
   const eventMultiplier = useMemo(() => {
@@ -90,50 +91,71 @@ const App: React.FC = () => {
     return rawSales * eventMultiplier;
   }, [dayparts, eventMultiplier]);
   
-  // Rules-Based Deterministic Prep Engine with Learning Loop
   const calculatePrepNeed = (item: PrepItem, totalTarget: number, wasteData: WasteEntry[]) => {
     const today = new Date().toLocaleDateString('en-US', { weekday: 'long' });
-    const isWeekend = ['Thursday', 'Friday', 'Saturday', 'Sunday'].includes(today);
+    const historicalAvg = item.forecastNeeded;
+    const multipliers: Record<string, number> = { 
+      'Monday': 0.70, 'Tuesday': 0.75, 'Wednesday': 0.80, 
+      'Thursday': 1.05, 'Friday': 1.25, 'Saturday': 1.30, 'Sunday': 1.15 
+    };
+    const dowMultiplier = multipliers[today] || 1.0;
     
-    // Baseline Need based on historical PMIX average
-    let baseNeed = (totalTarget / 350) * item.forecastNeeded; 
+    let adjustedNeed = historicalAvg;
+    if (['Monday', 'Tuesday', 'Wednesday'].includes(today)) {
+      adjustedNeed = historicalAvg * 0.333; 
+    }
+    adjustedNeed *= dowMultiplier;
+
+    const buffers: Record<string, number> = {
+      'Protein': item.costPerUnit > 10 ? 1.15 : 1.20,
+      'Produce': 1.25,
+      'Staples': 1.10,
+      'Sauce': 1.30,
+      'Other': 1.20
+    };
+    const buffer = buffers[item.category] || 1.20;
+    let bufferedNeed = adjustedNeed * buffer;
+
+    const itemWaste = wasteData.filter(w => w.itemName === item.name);
+    const totalWasted = itemWaste.reduce((sum, w) => sum + w.quantity, 0);
+    const wasteRatio = totalWasted / (item.prepNeeded || 1);
     
-    // Check for "Learning Loop" - High Waste in recent logs
-    const recentWaste = wasteData.filter(w => w.itemName === item.name);
-    const totalWasted = recentWaste.reduce((sum, w) => sum + w.quantity, 0);
-    const wasteFactor = totalWasted > 0 ? 0.85 : 1.0; // Reduce by 15% if recurring waste exists
+    if (wasteRatio > 0.25) bufferedNeed *= 0.80; 
+    else if (wasteRatio > 0.15 && item.costPerUnit > 10) bufferedNeed *= 0.85; 
+    else if (wasteRatio > 0.15) bufferedNeed *= 0.90; 
+    else if (wasteRatio < 0.05) bufferedNeed *= 1.10; 
 
-    const multiplier = isWeekend ? 1.5 : 0.5;
-    baseNeed = baseNeed * multiplier * wasteFactor;
-
-    const buffer = item.category === 'Protein' ? 1.25 : 1.15;
-    let bufferedNeed = baseNeed * buffer;
-
-    let toPrep = Math.max(0, bufferedNeed - item.currentStock);
+    let toPrep = Math.ceil(bufferedNeed - item.currentStock);
+    toPrep = Math.max(0, toPrep);
 
     if (item.shelfLifeDays <= 1) {
-      toPrep = Math.min(toPrep, baseNeed * 1.5);
+      toPrep = Math.min(toPrep, Math.ceil(historicalAvg * 1.5));
     }
     
-    let explanation = `${today} ${isWeekend ? 'Weekend' : 'Weekday'} multiplier (${multiplier}x) + ${item.category} buffer (${((buffer-1)*100).toFixed(0)}%)`;
-    if (wasteFactor < 1.0) {
-      explanation += ` | Adjusted -15% due to recent high waste logs.`;
-    }
-    
-    return {
-      amount: parseFloat(toPrep.toFixed(2)),
-      explanation
-    };
+    const explanation = `${historicalAvg} (Avg) × ${dowMultiplier} (DOW) × ${buffer} (Buf) - ${item.currentStock} (Inv) = ${toPrep}`;
+    return { amount: toPrep, explanation };
+  };
+
+  const calculatePriorityScore = (item: PrepItem) => {
+    const shelfLifeMod = item.shelfLifeDays < 1 ? 5 : item.shelfLifeDays <= 2 ? 3 : 1;
+    return (item.itemCriticality * 2) + (item.prepTimeMinutes / 10) + shelfLifeMod;
   };
 
   const stations = useMemo(() => {
     const groups: Record<string, PrepItem[]> = {};
     prepItems.forEach(item => {
       const calc = calculatePrepNeed(item, totalTargetVolume, wasteLogs);
-      const updated = { ...item, prepNeeded: calc.amount, whyExplanation: calc.explanation };
+      const score = calculatePriorityScore(item);
+      const updated = { 
+        ...item, 
+        prepNeeded: calc.amount, 
+        whyExplanation: calc.explanation,
+        priority: score > 15 ? 'High' : score > 8 ? 'Medium' : 'Low'
+      } as PrepItem;
       if (!groups[item.station]) groups[item.station] = [];
       groups[item.station].push(updated);
     });
+    Object.keys(groups).forEach(k => groups[k].sort((a, b) => calculatePriorityScore(b) - calculatePriorityScore(a)));
     return groups;
   }, [prepItems, totalTargetVolume, wasteLogs]);
 
@@ -143,13 +165,9 @@ const App: React.FC = () => {
 
   const handleDaypartChange = (dp: string, field: keyof DaypartConfig, val: string) => {
     const num = parseFloat(val) || 0;
-    setDayparts(prev => ({
-      ...prev,
-      [dp]: { ...prev[dp], [field]: num }
-    }));
+    setDayparts(prev => ({ ...prev, [dp]: { ...prev[dp], [field]: num } }));
   };
 
-  // Waste Log State
   const [showWasteForm, setShowWasteForm] = useState(false);
   const [newWaste, setNewWaste] = useState<Partial<WasteEntry>>({
     reasonCode: 'OVERPRODUCTION',
@@ -163,81 +181,48 @@ const App: React.FC = () => {
     const entry: WasteEntry = {
       id: `w_${Date.now()}`,
       itemName: newWaste.itemName as string,
-      itemType: newWaste.itemType || 'Prepared Item',
+      itemType: 'Prepared Item',
       quantity: Number(newWaste.quantity),
-      unit: newWaste.unit || 'kg',
-      reason: newWaste.reason || 'Manual log',
-      reasonCode: newWaste.reasonCode || 'OTHER',
-      category: newWaste.category || 'Pre-Consumer',
-      station: newWaste.station || 'General Prep',
-      shift: newWaste.shift || 'PM',
-      staffInitials: newWaste.staffInitials || 'AN',
+      unit: 'kg',
+      reason: newWaste.reason || 'Overproduction detected',
+      reasonCode: (newWaste.reasonCode as WasteReasonCode) || 'OVERPRODUCTION',
+      category: 'Pre-Consumer',
+      station: 'Kitchen',
+      shift: 'PM',
+      staffInitials: 'CH',
       timestamp: new Date().toISOString(),
-      costPerUnit: newWaste.costPerUnit || 1.0,
-      totalCost: (newWaste.quantity || 0) * (newWaste.costPerUnit || 1.0),
-      disposalMethod: newWaste.disposalMethod || 'Landfill'
+      costPerUnit: 1.5,
+      totalCost: Number(newWaste.quantity) * 1.5,
+      disposalMethod: 'Compost'
     };
     setWasteLogs(prev => [entry, ...prev]);
     setShowWasteForm(false);
-    setNewWaste({ reasonCode: 'OVERPRODUCTION', category: 'Pre-Consumer', shift: 'PM', disposalMethod: 'Compost' });
   };
 
-  const totalWasteCost = useMemo(() => {
-    return wasteLogs.reduce((sum, w) => sum + (w.totalCost || 0), 0);
-  }, [wasteLogs]);
-  
+  const totalWasteCost = useMemo(() => wasteLogs.reduce((sum, w) => sum + w.totalCost, 0), [wasteLogs]);
+
   const [isLiveActive, setIsLiveActive] = useState(false);
   const [transcription, setTranscription] = useState<{user: string, agent: string}[]>([]);
   const [currentAgentText, setCurrentAgentText] = useState('');
   const [currentUserText, setCurrentUserText] = useState('');
-  
-  const inputAudioContextRef = useRef<AudioContext | null>(null);
-  const outputAudioContextRef = useRef<AudioContext | null>(null);
   const sessionRef = useRef<any>(null);
-  const nextStartTimeRef = useRef(0);
-  const sourcesRef = useRef(new Set<AudioBufferSourceNode>());
 
   const startLiveSession = async () => {
     if (isLiveActive) { sessionRef.current?.close(); setIsLiveActive(false); return; }
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
-    inputAudioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
-    outputAudioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-
+    
     const sessionPromise = ai.live.connect({
       model: 'gemini-2.5-flash-native-audio-preview-12-2025',
       callbacks: {
-        onopen: () => {
-          setIsLiveActive(true);
-          const source = inputAudioContextRef.current!.createMediaStreamSource(stream);
-          const scriptProcessor = inputAudioContextRef.current!.createScriptProcessor(4096, 1, 1);
-          scriptProcessor.onaudioprocess = (e) => {
-            const inputData = e.inputBuffer.getChannelData(0);
-            const int16 = new Int16Array(inputData.length);
-            for (let i = 0; i < inputData.length; i++) int16[i] = inputData[i] * 32768;
-            sessionPromise.then(s => s.sendRealtimeInput({ media: { data: encode(new Uint8Array(int16.buffer)), mimeType: 'audio/pcm;rate=16000' } }));
-          };
-          source.connect(scriptProcessor);
-          scriptProcessor.connect(inputAudioContextRef.current!.destination);
-        },
+        onopen: () => setIsLiveActive(true),
         onmessage: async (message: LiveServerMessage) => {
-          if (message.serverContent?.outputTranscription) setCurrentAgentText(prev => prev + message.serverContent!.outputTranscription!.text);
-          else if (message.serverContent?.inputTranscription) setCurrentUserText(prev => prev + message.serverContent!.inputTranscription!.text);
-          if (message.serverContent?.turnComplete) { setTranscription(prev => [...prev, { user: currentUserText, agent: currentAgentText }]); setCurrentUserText(''); setCurrentAgentText(''); }
-          const base64Audio = message.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
-          if (base64Audio && outputAudioContextRef.current) {
-            const ctx = outputAudioContextRef.current;
-            nextStartTimeRef.current = Math.max(nextStartTimeRef.current, ctx.currentTime);
-            const buffer = await decodeAudioData(decode(base64Audio), ctx, 24000, 1);
-            const source = ctx.createBufferSource();
-            source.buffer = buffer;
-            source.connect(ctx.destination);
-            source.start(nextStartTimeRef.current);
-            nextStartTimeRef.current += buffer.duration;
-            sourcesRef.current.add(source);
-            source.onended = () => sourcesRef.current.delete(source);
+          if (message.serverContent?.outputTranscription) setCurrentAgentText(p => p + message.serverContent!.outputTranscription!.text);
+          else if (message.serverContent?.inputTranscription) setCurrentUserText(p => p + message.serverContent!.inputTranscription!.text);
+          if (message.serverContent?.turnComplete) { 
+            setTranscription(prev => [...prev, { user: currentUserText, agent: currentAgentText }]); 
+            setCurrentUserText(''); setCurrentAgentText(''); 
           }
-          if (message.serverContent?.interrupted) { sourcesRef.current.forEach(s => s.stop()); sourcesRef.current.clear(); nextStartTimeRef.current = 0; }
         },
         onclose: () => setIsLiveActive(false),
       },
@@ -245,719 +230,383 @@ const App: React.FC = () => {
         responseModalities: [Modality.AUDIO],
         outputAudioTranscription: {},
         inputAudioTranscription: {},
-        systemInstruction: `You are the PrepList Agent™, an intelligent sous-chef advisor. 
-        Current Waste Profile: Total waste cost is $${totalWasteCost.toFixed(2)}. Focus on items with reasonCode 'OVERPRODUCTION'.
-        All your responses must clearly label AI suggestions vs. deterministic rules.`
+        systemInstruction: "You are the PrepList Agent™. Logic: Base × Day Multiplier × Buffer - Inventory."
       }
     });
     sessionRef.current = await sessionPromise;
   };
 
   return (
-    <div className="min-h-screen flex flex-col md:flex-row bg-[#f8fafc]">
+    <div className="min-h-screen flex flex-col md:flex-row bg-[#f1f5f9]">
       <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
       
       <main className="flex-1 md:ml-64 flex flex-col h-screen overflow-hidden">
-        <header className="p-4 md:p-6 bg-white border-b flex justify-between items-center shrink-0 shadow-sm relative z-10">
+        <header className="p-4 md:p-6 bg-white border-b flex justify-between items-center shrink-0 shadow-md relative z-30">
           <div>
-            <h1 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-              <span className="p-1.5 bg-indigo-600 text-white rounded-lg"><Icons.ChefHat /></span>
+            <h1 className="text-2xl font-black text-slate-900 flex items-center gap-3">
+              <span className="p-2 bg-indigo-600 text-white rounded-xl shadow-lg shadow-indigo-100"><Icons.ChefHat /></span>
               PrepList Agent™
             </h1>
-            <p className="text-xs text-slate-500 font-medium uppercase tracking-wider">Deterministic Kitchen Intelligence</p>
+            <p className="text-[10px] text-indigo-600 font-black uppercase tracking-[0.2em]">Deterministic Kitchen Intelligence</p>
           </div>
-          <button onClick={startLiveSession} className={`flex items-center gap-2 px-6 py-2 rounded-full font-bold transition-all shadow-lg active:scale-95 ${isLiveActive ? 'bg-rose-500 text-white animate-pulse' : 'bg-indigo-600 text-white hover:bg-indigo-700'}`}>
+          <button onClick={startLiveSession} className={`flex items-center gap-3 px-8 py-3 rounded-2xl font-black transition-all shadow-xl active:scale-95 ${isLiveActive ? 'bg-rose-500 text-white animate-pulse' : 'bg-slate-900 text-white hover:bg-indigo-600'}`}>
             {isLiveActive ? <Icons.MicOff /> : <Icons.Mic />}
-            {isLiveActive ? 'Listening...' : 'Talk to Agent'}
+            {isLiveActive ? 'Agent Listening' : 'Talk to Agent'}
           </button>
         </header>
 
-        <div className="flex-1 overflow-y-auto p-4 md:p-8 space-y-8 flex flex-col">
-          <div className="flex-1">
-            {activeTab === 'home' && (
-              <div className="max-w-6xl mx-auto space-y-16 animate-in fade-in duration-700 pb-10">
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center mt-8">
-                  <div className="space-y-6">
-                    <div className="inline-block bg-indigo-50 text-indigo-700 px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-widest border border-indigo-100">Welcome to FohBoh™</div>
-                    <h2 className="text-5xl md:text-6xl font-black text-slate-900 leading-[1.1]">The Future of <span className="text-indigo-600">Kitchen Execution.</span></h2>
-                    <p className="text-lg text-slate-500 max-w-lg leading-relaxed">PrepList Agent™ combines deterministic rules with AI-driven sales forecasting to ensure your kitchen is always ready, never over-prepped, and perfectly synchronized.</p>
-                    <div className="flex flex-wrap gap-4 pt-4">
-                      <button onClick={() => setActiveTab('get-started')} className="bg-emerald-500 hover:bg-emerald-600 text-white px-8 py-4 rounded-2xl font-black shadow-xl shadow-emerald-100 transition-all flex items-center gap-3 active:scale-95">Get Started Now <Icons.Check /></button>
-                      <button onClick={() => setActiveTab('dashboard')} className="bg-white border-2 border-slate-200 text-slate-900 px-8 py-4 rounded-2xl font-black hover:bg-slate-50 transition-all active:scale-95">View Dashboard</button>
-                    </div>
+        <div className="flex-1 overflow-y-auto p-4 md:p-10 space-y-12 flex flex-col relative z-10 bg-gradient-to-b from-white to-[#f1f5f9]">
+          {activeTab === 'home' && (
+            <div className="max-w-6xl mx-auto space-y-20 animate-in pb-20">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center pt-8">
+                <div className="space-y-8">
+                  <div className="inline-flex items-center gap-2 bg-indigo-100 text-indigo-700 px-5 py-2 rounded-full text-[11px] font-black uppercase tracking-widest border border-indigo-200">
+                    <span className="w-2 h-2 bg-indigo-600 rounded-full animate-ping"></span>
+                    Operational Intelligence Active
                   </div>
-                  <div className="relative">
-                    <div className="aspect-square bg-indigo-600/5 rounded-[3rem] p-8 flex items-center justify-center relative overflow-hidden">
-                      <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-600 rounded-full blur-[100px] opacity-10"></div>
-                      <div className="bg-white rounded-3xl shadow-2xl p-6 border-2 border-indigo-50 w-full relative z-10 transform -rotate-3 hover:rotate-0 transition-transform duration-500">
-                        <div className="flex justify-between items-center mb-6">
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 bg-indigo-100 rounded-xl flex items-center justify-center text-indigo-600 font-black">AI</div>
-                            <div>
-                              <p className="font-bold text-slate-900">Agent Analysis</p>
-                              <p className="text-[10px] text-slate-400 font-black">RECOMMENDATION</p>
-                            </div>
-                          </div>
-                          <div className="px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full text-[10px] font-black tracking-tighter uppercase">99% Confidence</div>
-                        </div>
-                        <p className="text-sm text-slate-600 italic leading-relaxed">"Based on the Downtown Farmers Market event tomorrow, I've increased 'Diced Onions' prep by 15%. This matches your historical 20% spike during similar events."</p>
+                  <h2 className="text-6xl md:text-7xl font-black text-slate-900 leading-[0.95] tracking-tight">
+                    Never <span className="text-indigo-600 italic">86</span> <br/>
+                    a Menu Item <br/>
+                    Again.
+                  </h2>
+                  <p className="text-xl text-slate-700 font-medium max-w-lg leading-relaxed">
+                    FohBoh PrepList Agent™ synchronizes sales forecasts, inventory levels, and menu velocity into a perfectly prioritized daily execution plan.
+                  </p>
+                  <div className="flex flex-wrap gap-5 pt-4">
+                    <button onClick={() => setActiveTab('get-started')} className="bg-emerald-600 hover:bg-emerald-700 text-white px-10 py-5 rounded-[2rem] font-black text-lg shadow-2xl shadow-emerald-200 transition-all hover:-translate-y-1 active:scale-95">Get Started Today</button>
+                    <button onClick={() => setActiveTab('dashboard')} className="bg-white border-4 border-slate-900 text-slate-900 px-10 py-5 rounded-[2rem] font-black text-lg hover:bg-slate-900 hover:text-white transition-all hover:-translate-y-1 active:scale-95">View Dashboard</button>
+                  </div>
+                </div>
+                <div className="relative">
+                  <div className="absolute -inset-4 bg-indigo-500/20 rounded-[4rem] blur-3xl -z-10"></div>
+                  <div className="bg-slate-900 p-10 rounded-[3.5rem] shadow-2xl rotate-2 hover:rotate-0 transition-all duration-700 border-8 border-white">
+                    <div className="flex items-center gap-5 mb-8">
+                      <div className="w-16 h-16 bg-emerald-500 text-white rounded-3xl flex items-center justify-center font-black text-2xl shadow-lg">KM</div>
+                      <div>
+                        <p className="font-black text-white text-xl uppercase tracking-tight">Agent Forecast</p>
+                        <p className="text-[10px] font-black text-emerald-400 uppercase tracking-widest">Confidence: 99.4%</p>
                       </div>
                     </div>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                  {[
-                    { title: "Reduce Waste", desc: "Automated adjustments based on historical overprep logs.", icon: <Icons.Trash />, color: "bg-rose-50 text-rose-600" },
-                    { title: "Boost Efficiency", desc: "Station-specific tasks sorted by priority and knife-skill level.", icon: <Icons.ChefHat />, color: "bg-indigo-50 text-indigo-600" },
-                    { title: "Deterministic Logic", desc: "Hard rules paired with AI insights for 100% reliable pars.", icon: <Icons.Dashboard />, color: "bg-emerald-50 text-emerald-600" }
-                  ].map((feature, i) => (
-                    <div key={i} className="bg-white p-8 rounded-3xl border border-slate-100 shadow-sm hover:shadow-xl transition-all group">
-                      <div className={`w-14 h-14 ${feature.color} rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform`}>{feature.icon}</div>
-                      <h4 className="text-xl font-bold text-slate-900 mb-2">{feature.title}</h4>
-                      <p className="text-slate-500 text-sm leading-relaxed">{feature.desc}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {activeTab === 'get-started' && (
-              <div className="max-w-4xl mx-auto space-y-12 animate-in fade-in duration-500 pb-10">
-                <div className="text-center space-y-4">
-                  <h2 className="text-4xl font-black text-slate-900">Complete Your PrepList</h2>
-                  <p className="text-slate-500 text-lg">Follow these 4 steps to synchronize your kitchen for today's service.</p>
-                </div>
-
-                <div className="relative space-y-12 before:absolute before:left-8 before:top-8 before:bottom-8 before:w-1 before:bg-slate-100 before:-z-10">
-                  {[
-                    { 
-                      step: 1, 
-                      title: "Configure Daily Forecast", 
-                      desc: "Enter your projected meal volume and average checks for each daypart. Add any local events that might spike traffic.",
-                      tab: "inputs",
-                      icon: <Icons.Search />,
-                      action: "Go to Inputs"
-                    },
-                    { 
-                      step: 2, 
-                      title: "Sync Inventory Levels", 
-                      desc: "Ensure your current counts in the system match your walk-in shelf reality. AI uses this 'On-Hand' delta for prep targets.",
-                      tab: "inventory",
-                      icon: <Icons.Inventory />,
-                      action: "Verify Inventory"
-                    },
-                    { 
-                      step: 3, 
-                      title: "Review & Adjust Prep Needs", 
-                      desc: "The engine automatically explodes your P-Mix across your cover target. Review station assignments and AI suggestions.",
-                      tab: "preplist",
-                      icon: <Icons.ChefHat />,
-                      action: "Review Prep List"
-                    },
-                    { 
-                      step: 4, 
-                      title: "Execute & Mark Complete", 
-                      desc: "Hand off the digital list to your team. As they complete tasks, track completion in real-time on your dashboard.",
-                      tab: "dashboard",
-                      icon: <Icons.Dashboard />,
-                      action: "Go to Dashboard"
-                    }
-                  ].map((item, i) => (
-                    <div key={i} className="flex gap-8 items-start animate-in fade-in slide-in-from-left-4" style={{ animationDelay: `${i * 100}ms` }}>
-                      <div className="w-16 h-16 rounded-full bg-white border-4 border-emerald-500 flex items-center justify-center text-emerald-500 font-black text-xl shadow-lg shrink-0">
-                        {item.step}
-                      </div>
-                      <div className="bg-white p-8 rounded-3xl border shadow-sm flex-1 hover:border-emerald-500 transition-colors group">
-                        <div className="flex items-center gap-3 mb-2">
-                          <div className="text-slate-400 group-hover:text-emerald-500 transition-colors">{item.icon}</div>
-                          <h4 className="text-xl font-bold text-slate-900">{item.title}</h4>
-                        </div>
-                        <p className="text-slate-500 text-sm leading-relaxed mb-6">{item.desc}</p>
-                        <button onClick={() => setActiveTab(item.tab)} className="bg-slate-900 text-white px-6 py-2.5 rounded-xl text-sm font-bold hover:bg-indigo-600 transition-colors flex items-center gap-2 group/btn">
-                          {item.action}
-                          <Icons.Trend />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-            
-            {activeTab === 'dashboard' && (
-              <div className="space-y-6 max-w-7xl mx-auto animate-in fade-in duration-500 pb-10">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div className="bg-white p-6 rounded-3xl border shadow-sm relative overflow-visible">
-                     <h3 className="text-slate-500 text-sm font-medium mb-1">Low Stock Alerts <Tooltip what="Ingredients below Par Levels." source="IMS Counts." why="Prevents 86ing items." align="left" /></h3>
-                     <p className="text-3xl font-bold text-slate-900">3 Items</p>
-                  </div>
-                  <div className="bg-white p-6 rounded-3xl border shadow-sm overflow-visible">
-                     <h3 className="text-slate-500 text-sm font-medium mb-1">Daily Sales Forecast <Tooltip what="Projected revenue calculation." source="Meals x Avg Check." why="Staffing and production targets." align="center" /></h3>
-                     <p className="text-3xl font-bold text-slate-900">${totalSalesForecast.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
-                  </div>
-                  <div className="bg-white p-6 rounded-3xl border shadow-sm overflow-visible">
-                     <h3 className="text-slate-500 text-sm font-medium mb-1">Waste (OVERPREP) <Tooltip what="Items discarded due to high par levels." source="Waste Sheets." why="Signals need for rule adjustments." align="right" /></h3>
-                     <p className="text-3xl font-bold text-rose-600">${totalWasteCost.toFixed(2)}</p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                  <div className="lg:col-span-2 bg-white p-6 rounded-3xl border shadow-sm overflow-visible">
-                    <div className="flex flex-col md:flex-row md:items-end justify-between mb-6 gap-4">
-                      <h3 className="font-bold text-slate-900">Historical Demand Visualization <Tooltip what="Actual vs Predicted Sales." source="POS data." why="AI and Rules verification." align="left" /></h3>
-                    </div>
-                    <ForecastChart data={MOCK_FORECAST} />
-                  </div>
-
-                  <div className="bg-white p-6 rounded-3xl border shadow-sm overflow-visible">
-                    <h3 className="font-bold text-slate-900 mb-6 flex items-center gap-2">
-                      <Icons.Search /> Active Data Pipelines
-                      <Tooltip what="Live connections to your restaurant technology stack." source="API Webhooks." why="Ensures real-time accuracy of prep recommendations." align="right" />
-                    </h3>
-                    <div className="space-y-4">
-                      {[
-                        { name: 'Toast POS', status: 'Live', time: 'Real-time', color: 'bg-emerald-500' },
-                        { name: 'MarketMan IMS', status: 'Healthy', time: '12m ago', color: 'bg-emerald-500' },
-                        { name: '7shifts Labor', status: 'Syncing', time: 'Just now', color: 'bg-indigo-500' },
-                        { name: 'Weather API', status: 'Healthy', time: '1h ago', color: 'bg-emerald-500' }
-                      ].map(source => (
-                        <div key={source.name} className="flex items-center gap-4 p-4 border rounded-2xl bg-slate-50/50">
-                          <div className={`w-3 h-3 rounded-full ${source.color} animate-pulse shadow-[0_0_8px_rgba(0,0,0,0.1)]`}></div>
-                          <div>
-                            <p className="text-sm font-bold text-slate-900">{source.name}</p>
-                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{source.status} • {source.time}</p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-            
-            {activeTab === 'waste' && (
-              <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500 pb-10">
-                <div className="flex justify-between items-end">
-                  <div>
-                    <h2 className="text-2xl font-black text-slate-900">Waste Tracking Dashboard</h2>
-                    <p className="text-sm text-slate-500">2026 Compliance Standard: FDA Traceability & Cost Control</p>
-                  </div>
-                  <button 
-                    onClick={() => setShowWasteForm(true)}
-                    className="bg-rose-500 text-white px-6 py-2.5 rounded-xl font-bold flex items-center gap-2 shadow-lg shadow-rose-100 hover:bg-rose-600 transition-all active:scale-95"
-                  >
-                    <Icons.Trash /> Log Waste Event
-                  </button>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                  <div className="bg-white p-6 rounded-3xl border shadow-sm">
-                    <h3 className="text-xs font-black text-slate-400 uppercase mb-1">Total Waste Cost</h3>
-                    <p className="text-3xl font-black text-rose-600">${totalWasteCost.toFixed(2)}</p>
-                    <p className="text-[10px] text-slate-400 font-bold uppercase mt-1">This Period</p>
-                  </div>
-                  <div className="bg-white p-6 rounded-3xl border shadow-sm">
-                    <h3 className="text-xs font-black text-slate-400 uppercase mb-1">Overproduction</h3>
-                    <p className="text-3xl font-black text-slate-800">
-                      ${wasteLogs.filter(w => w.reasonCode === 'OVERPRODUCTION').reduce((sum, w) => sum + w.totalCost, 0).toFixed(2)}
+                    <p className="text-slate-300 text-lg italic leading-relaxed font-medium">
+                      "System detected Downtown Farmers Market event. Automatic Breakfast buffer applied. NYC Strip Steak par increased to 25 units based on Friday historical velocity."
                     </p>
-                    <p className="text-[10px] text-slate-400 font-bold uppercase mt-1">Optimization Goal: -15%</p>
-                  </div>
-                  <div className="bg-white p-6 rounded-3xl border shadow-sm">
-                    <h3 className="text-xs font-black text-slate-400 uppercase mb-1">Spoilage/Storage</h3>
-                    <p className="text-3xl font-black text-slate-800">
-                      ${wasteLogs.filter(w => ['SPOILAGE', 'STORAGE'].includes(w.reasonCode)).reduce((sum, w) => sum + w.totalCost, 0).toFixed(2)}
-                    </p>
-                    <p className="text-[10px] text-slate-400 font-bold uppercase mt-1">Facility Issue Alerts</p>
-                  </div>
-                  <div className="bg-indigo-600 p-6 rounded-3xl shadow-lg text-white">
-                    <h3 className="text-xs font-black text-indigo-200 uppercase mb-1">AI Recommendation</h3>
-                    <p className="text-sm font-bold">Reduce "Diced Onions" prep by 2.2kg for tomorrow based on pattern.</p>
-                  </div>
-                </div>
-
-                {showWasteForm && (
-                  <div className="bg-white border-2 border-rose-100 rounded-[2rem] p-8 shadow-2xl space-y-6 animate-in fade-in zoom-in duration-300">
-                    <div className="flex justify-between items-center border-b pb-4">
-                      <h3 className="text-xl font-black text-slate-900">New Waste Entry</h3>
-                      <button onClick={() => setShowWasteForm(false)} className="text-slate-400 hover:text-rose-500">Close</button>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                      <div className="space-y-2">
-                        <label className="text-[10px] font-black text-slate-400 uppercase">Item Name</label>
-                        <select 
-                          className="w-full bg-slate-50 border-2 border-slate-100 rounded-xl px-4 py-3 text-slate-900 font-bold focus:ring-2 focus:ring-rose-500 outline-none"
-                          onChange={(e) => setNewWaste({...newWaste, itemName: e.target.value})}
-                        >
-                          <option value="">Select Item...</option>
-                          {prepItems.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
-                        </select>
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-[10px] font-black text-slate-400 uppercase">Quantity & Unit</label>
-                        <div className="flex gap-2">
-                          <input type="number" step="0.1" placeholder="Qty" className="w-2/3 bg-slate-50 border-2 border-slate-100 rounded-xl px-4 py-3 text-slate-900 font-bold outline-none" onChange={(e) => setNewWaste({...newWaste, quantity: Number(e.target.value)})} />
-                          <input type="text" placeholder="Unit" className="w-1/3 bg-slate-50 border-2 border-slate-100 rounded-xl px-4 py-3 text-slate-900 font-bold outline-none" onChange={(e) => setNewWaste({...newWaste, unit: e.target.value})} />
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-[10px] font-black text-slate-400 uppercase">Reason Code</label>
-                        <select 
-                          className="w-full bg-slate-50 border-2 border-slate-100 rounded-xl px-4 py-3 text-slate-900 font-bold outline-none"
-                          onChange={(e) => setNewWaste({...newWaste, reasonCode: e.target.value as WasteReasonCode})}
-                        >
-                          <option value="OVERPRODUCTION">OVERPRODUCTION</option>
-                          <option value="SPOILAGE">SPOILAGE</option>
-                          <option value="PREP_ERROR">PREP_ERROR</option>
-                          <option value="STORAGE">STORAGE</option>
-                          <option value="OTHER">OTHER</option>
-                        </select>
-                      </div>
-                    </div>
-                    <div className="flex justify-end pt-4">
-                      <button 
-                        onClick={logWasteEntry}
-                        className="bg-rose-500 text-white px-10 py-3 rounded-2xl font-black shadow-lg shadow-rose-100 hover:bg-rose-600 transition-all"
-                      >
-                        Commit Log Entry
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                <div className="bg-white rounded-3xl border shadow-sm overflow-hidden">
-                  <div className="p-6 bg-slate-50 border-b flex justify-between items-center">
-                    <h3 className="font-black text-slate-900 uppercase tracking-widest text-sm">Recent Logs</h3>
-                    <span className="text-[10px] font-black text-slate-400 uppercase">Audit Trail - 2026 Compliant</span>
-                  </div>
-                  <div className="divide-y">
-                    {wasteLogs.map(log => (
-                      <div key={log.id} className="p-6 hover:bg-slate-50 transition-colors flex justify-between items-center">
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-3">
-                            <h4 className="font-bold text-slate-900">{log.itemName}</h4>
-                            <span className="text-[10px] font-black bg-rose-50 text-rose-600 px-2 py-0.5 rounded-full uppercase">{log.reasonCode}</span>
-                          </div>
-                          <p className="text-xs text-slate-500 font-medium">Logged by {log.staffInitials} • {log.shift} Shift • Station: {log.station}</p>
-                          <p className="text-[10px] text-slate-400 italic">Reason: {log.reason}</p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-lg font-black text-slate-900">{log.quantity} {log.unit}</p>
-                          <p className="text-xs font-bold text-rose-500">-${log.totalCost.toFixed(2)}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
-            
-            {activeTab === 'inputs' && (
-              <div className="max-w-5xl mx-auto space-y-8 animate-in fade-in duration-500 pb-10">
-                <div className="flex justify-between items-center">
-                  <h2 className="text-2xl font-black text-slate-900">Required Daily Inputs</h2>
-                  <div className="text-right">
-                    <p className="text-[10px] font-black text-slate-400 uppercase">Today's Total Forecast</p>
-                    <p className="text-2xl font-black text-indigo-600">${totalSalesForecast.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  {Object.entries(dayparts).map(([name, config]) => (
-                    <div key={name} className="bg-white rounded-3xl border shadow-sm p-6 space-y-6">
-                      <h3 className="font-black text-slate-900 uppercase tracking-widest text-sm flex items-center justify-between">
-                        {name} Service
-                        <span className="text-[10px] text-slate-400">Daypart {Object.keys(dayparts).indexOf(name) + 1}</span>
-                      </h3>
-                      
-                      <div className="space-y-4">
-                        <div>
-                          <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Projected Meals</label>
-                          <input 
-                            type="number" 
-                            value={config.volume} 
-                            onChange={(e) => handleDaypartChange(name, 'volume', e.target.value)}
-                            className="w-full bg-slate-50 border-slate-200 border-2 rounded-2xl px-4 py-3 text-2xl font-black text-slate-900 focus:ring-2 focus:ring-indigo-500 outline-none transition-all" 
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Avg Guest Check ($)</label>
-                          <input 
-                            type="number" 
-                            step="0.01"
-                            value={config.avgCheck} 
-                            onChange={(e) => handleDaypartChange(name, 'avgCheck', e.target.value)}
-                            className="w-full bg-slate-50 border-slate-200 border-2 rounded-2xl px-4 py-3 text-2xl font-black text-slate-900 focus:ring-2 focus:ring-indigo-500 outline-none transition-all" 
-                          />
-                        </div>
-                      </div>
-
-                      <div className="pt-4 border-t border-slate-50">
-                        <p className="text-[10px] font-black text-slate-400 uppercase">Projected Sales</p>
-                        <p className="text-lg font-black text-slate-800">${(config.volume * config.avgCheck).toLocaleString()}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <div className="bg-white rounded-3xl border shadow-sm p-6 overflow-visible">
-                    <h3 className="font-black text-slate-900 uppercase tracking-widest text-sm mb-4 flex items-center gap-2">
-                      <Icons.Search /> Special Event Flags
-                      <Tooltip what="Manual overrides for local events." source="Manager Input." why="Factors in outlier spikes." align="left" />
-                    </h3>
-                    <div className="space-y-3">
-                      {specialEvents.map(event => (
-                        <div key={event.id} className="flex items-center justify-between p-4 bg-indigo-50 rounded-2xl border border-indigo-100">
-                          <div>
-                            <p className="font-bold text-indigo-900">{event.name}</p>
-                            <p className="text-xs text-indigo-700">Focus: {event.menuFocus} | Impact: +{Math.round((event.coverIncrease - 1) * 100)}% covers</p>
-                          </div>
-                          <button className="text-indigo-400 hover:text-rose-500 transition-colors"><Icons.Trash /></button>
-                        </div>
-                      ))}
+                    <div className="mt-8 pt-8 border-t border-slate-700 flex justify-between">
+                       <div className="text-center"><p className="text-white font-black text-2xl">+$1.2k</p><p className="text-[9px] text-slate-500 font-black uppercase">Waste Saved</p></div>
+                       <div className="text-center"><p className="text-white font-black text-2xl">88%</p><p className="text-[9px] text-slate-500 font-black uppercase">Efficiency</p></div>
+                       <div className="text-center"><p className="text-white font-black text-2xl">0%</p><p className="text-[9px] text-slate-500 font-black uppercase">Outages</p></div>
                     </div>
                   </div>
                 </div>
               </div>
-            )}
 
-            {activeTab === 'preplist' && (
-              <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500 pb-10">
-                <div className="flex justify-between items-end">
-                   <div><h2 className="text-2xl font-black text-slate-900">Digital Prep List</h2><p className="text-sm text-slate-500 italic">Source: Deterministic rules-engine + Waste Optimization Factor</p></div>
-                </div>
-                
-                {(Object.entries(stations) as [string, PrepItem[]][]).map(([station, items]) => (
-                  <div key={station} className="bg-white rounded-3xl border shadow-sm overflow-visible mb-8">
-                    <div className="p-6 border-b bg-slate-50 rounded-t-3xl flex justify-between items-center">
-                      <h3 className="font-black text-indigo-900 uppercase tracking-widest text-sm flex items-center gap-2">
-                        <div className="w-2 h-2 rounded-full bg-indigo-600 animate-pulse"></div>
-                        Station: {station}
-                      </h3>
-                      <span className="text-xs font-bold text-slate-500">{items.length} Tasks Assigned</span>
-                    </div>
-                    <div className="divide-y overflow-visible">
-                      {items.map(item => (
-                        <div key={item.id} className="p-6 hover:bg-slate-50 transition-colors flex flex-col md:flex-row gap-6 relative overflow-visible">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-3 mb-1">
-                              <h4 className="text-lg font-bold text-slate-900">{item.name}</h4>
-                              <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${item.priority === 'High' ? 'bg-rose-50 text-rose-600' : 'bg-slate-100 text-slate-500'}`}>{item.priority}</span>
-                            </div>
-                            <p className="text-xs text-slate-500 font-medium leading-relaxed">{item.whyExplanation}</p>
-                          </div>
-                          <div className="flex flex-wrap items-center gap-4">
-                            <div className="bg-indigo-50 px-4 py-2 rounded-2xl text-center min-w-[100px]">
-                              <span className="text-[9px] font-black text-indigo-400 uppercase block">Need</span>
-                              <span className="text-lg font-black text-indigo-700">{item.prepNeeded} {item.unit}</span>
-                            </div>
-                            <button onClick={() => toggleItemStatus(item.id)} className={`px-5 py-2 rounded-xl border-2 font-black transition-all text-sm uppercase tracking-widest ${item.status === 'Completed' ? 'bg-emerald-500 border-emerald-500 text-white shadow-lg shadow-emerald-100' : 'bg-white border-slate-200 text-slate-400 hover:border-indigo-600 hover:text-indigo-600'}`}>
-                              {item.status === 'Completed' ? 'Finished' : 'Mark Done'}
-                            </button>
-                          </div>
-                        </div>
-                      ))}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
+                {[
+                  { title: "Smart Par Management", desc: "Dynamic par levels adjusted daily based on daypart volume and item velocity.", icon: <Icons.Trend />, color: "bg-indigo-600" },
+                  { title: "Waste Learning Loop", desc: "Logged overprep automatically triggers reduction rules to fix future par calculations.", icon: <Icons.Trash />, color: "bg-rose-500" },
+                  { title: "Station Orchestration", desc: "Prep tasks grouped by kitchen station and prioritized by prep-time and shelf-life.", icon: <Icons.ChefHat />, color: "bg-emerald-600" }
+                ].map((feature, i) => (
+                  <div key={i} className="bg-white p-10 rounded-[3rem] border-4 border-slate-50 shadow-xl hover:shadow-2xl transition-all group hover:-translate-y-2">
+                    <div className={`w-16 h-16 ${feature.color} text-white rounded-2xl flex items-center justify-center mb-8 group-hover:scale-110 transition-transform shadow-lg`}>{feature.icon}</div>
+                    <h4 className="text-2xl font-black text-slate-900 mb-4 tracking-tight uppercase leading-none">{feature.title}</h4>
+                    <p className="text-slate-600 font-medium leading-relaxed">{feature.desc}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'get-started' && (
+            <div className="max-w-4xl mx-auto space-y-16 animate-in pb-20">
+              <div className="text-center space-y-4">
+                <h2 className="text-5xl font-black text-slate-900 tracking-tight">Sync Your Kitchen</h2>
+                <p className="text-slate-600 text-xl font-medium">Complete these 4 critical steps for today's service.</p>
+              </div>
+              <div className="relative space-y-12 before:absolute before:left-10 before:top-10 before:bottom-10 before:w-2 before:bg-indigo-100 before:-z-10">
+                {[
+                  { step: 1, title: "Configure Forecasts", desc: "Enter meal counts for Breakfast, Lunch, and Dinner. Rules applied instantly.", tab: "inputs", action: "Go to Inputs" },
+                  { step: 2, title: "Verify On-Hand Stock", desc: "Confirm current inventory levels to calculate final 'Prep-Need' delta.", tab: "inventory", action: "Update Inventory" },
+                  { step: 3, title: "Execute Prep List", desc: "Review prioritized tasks sorted by station and knife-skill level.", tab: "preplist", action: "View Prep List" },
+                  { step: 4, title: "Analyze & Log Waste", desc: "Close the loop by logging overprep. System learns and adjusts for tomorrow.", tab: "waste", action: "Review Waste" }
+                ].map((item, i) => (
+                  <div key={i} className="flex gap-10 items-start group">
+                    <div className="w-20 h-20 rounded-full bg-white border-8 border-indigo-600 flex items-center justify-center text-indigo-600 font-black text-2xl shadow-2xl shrink-0 group-hover:scale-110 transition-transform">{item.step}</div>
+                    <div className="bg-white p-10 rounded-[3rem] border-4 border-slate-100 shadow-xl flex-1 hover:border-indigo-600 transition-all">
+                      <h4 className="text-2xl font-black text-slate-900 mb-3 uppercase tracking-tight">{item.title}</h4>
+                      <p className="text-slate-600 font-medium mb-8 text-lg">{item.desc}</p>
+                      <button onClick={() => setActiveTab(item.tab)} className="bg-slate-900 text-white px-8 py-4 rounded-2xl font-black hover:bg-indigo-600 transition-all shadow-lg active:scale-95">{item.action}</button>
                     </div>
                   </div>
                 ))}
               </div>
-            )}
+            </div>
+          )}
 
-            {activeTab === 'pmix' && (
-              <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500 pb-10">
-                <div className="flex flex-col md:flex-row gap-8">
-                  {/* Left Column: Product Mix Sidebar */}
-                  <div className="md:w-80 space-y-6 shrink-0">
-                    <div className="bg-white rounded-3xl border shadow-sm p-6 overflow-visible">
-                      <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2">
-                        <Icons.Trend /> Product Mix %
-                        <Tooltip what="7-day moving averages." source="Direct POS API." why="Determines baseline prep." align="left" />
-                      </h3>
-                      <div className="space-y-6">
-                        {menuItems.map(item => (
-                          <div key={item.id} className="space-y-2 border-b border-slate-50 pb-4 last:border-0">
-                            <div className="flex justify-between text-xs font-bold">
-                              <span className="text-slate-600">{item.name}</span>
-                              <span className="text-indigo-600">{(item.productMix * 100).toFixed(0)}%</span>
-                            </div>
-                            <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
-                              <div 
-                                className="bg-indigo-500 h-full rounded-full transition-all duration-1000" 
-                                style={{ width: `${item.productMix * 100}%` }}
-                              ></div>
-                            </div>
-                            <div className="flex items-center justify-between">
-                              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">7d Velocity</span>
-                              <div className="w-2/3"><MiniTrendChart data={item.history7Days} /></div>
-                            </div>
-                          </div>
-                        ))}
+          {activeTab === 'inputs' && (
+            <div className="max-w-6xl mx-auto space-y-12 animate-in pb-20">
+              <div className="flex justify-between items-end border-b-8 border-slate-900 pb-6">
+                 <div>
+                   <h2 className="text-5xl font-black text-slate-900 tracking-tight uppercase">Daily Required Fields</h2>
+                   <p className="text-indigo-600 font-black uppercase tracking-widest text-xs">Section 1: Forecasting Variables</p>
+                 </div>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                {Object.entries(dayparts).map(([name, config]) => (
+                  <div key={name} className="bg-white rounded-[3.5rem] border-8 border-slate-900 shadow-2xl p-10 space-y-8 hover:-translate-y-2 transition-transform">
+                    <h3 className="font-black text-slate-950 uppercase tracking-[0.2em] text-sm flex items-center gap-2">
+                       <span className="w-3 h-3 bg-indigo-600 rounded-full"></span>
+                       {name} Shift
+                    </h3>
+                    <div className="space-y-6">
+                      <div className="group">
+                        <label className="block text-xs font-black text-slate-950 uppercase mb-2 tracking-widest">Projected Covers</label>
+                        <input 
+                          type="number" 
+                          value={config.volume} 
+                          onChange={(e) => handleDaypartChange(name, 'volume', e.target.value)} 
+                          className="w-full bg-slate-50 border-4 border-slate-900 rounded-[1.5rem] px-6 py-5 text-4xl font-black text-black focus:bg-indigo-50 focus:border-indigo-600 transition-all outline-none" 
+                        />
                       </div>
-                    </div>
-
-                    <div className="bg-slate-900 rounded-3xl p-6 text-white shadow-xl relative overflow-hidden">
-                      <h3 className="text-xs font-black text-slate-400 uppercase mb-1">Target Sales Volume</h3>
-                      <p className="text-3xl font-black">${totalSalesForecast.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
-                      <p className="text-[10px] text-slate-400 mt-2 font-black uppercase tracking-widest">Base Target: {totalTargetVolume} meals</p>
+                      <div className="group">
+                        <label className="block text-xs font-black text-slate-950 uppercase mb-2 tracking-widest">Target Avg Check ($)</label>
+                        <input 
+                          type="number" 
+                          step="0.01" 
+                          value={config.avgCheck} 
+                          onChange={(e) => handleDaypartChange(name, 'avgCheck', e.target.value)} 
+                          className="w-full bg-slate-50 border-4 border-slate-900 rounded-[1.5rem] px-6 py-5 text-4xl font-black text-black focus:bg-indigo-50 focus:border-indigo-600 transition-all outline-none" 
+                        />
+                      </div>
                     </div>
                   </div>
+                ))}
+              </div>
 
-                  {/* Main Area: Detailed Analysis */}
-                  <div className="flex-1 space-y-8">
-                    {/* Volume Explosion Grid */}
-                    <div className="bg-white p-8 rounded-[2.5rem] border shadow-sm space-y-6">
-                      <div className="flex justify-between items-center">
-                        <h3 className="text-xl font-black text-slate-900 flex items-center gap-3">
-                          <span className="p-2 bg-indigo-50 text-indigo-600 rounded-xl"><Icons.Trend /></span>
-                          Menu Volume Explosion
-                        </h3>
-                        <div className="px-4 py-1.5 bg-slate-50 rounded-full text-[10px] font-black text-slate-400 uppercase tracking-tighter border">
-                          Deterministic Multiplier: {eventMultiplier.toFixed(2)}x
-                        </div>
+              <div className="bg-indigo-600 rounded-[4rem] p-12 shadow-2xl relative overflow-hidden">
+                <div className="absolute top-0 right-0 p-10 opacity-10"><Icons.Bot /></div>
+                <div className="flex flex-col md:flex-row justify-between items-center gap-10">
+                  <div className="text-white">
+                    <h3 className="text-3xl font-black uppercase tracking-tight mb-2 italic underline decoration-indigo-300 decoration-8 underline-offset-8">Special Event Flags</h3>
+                    <p className="text-indigo-100 font-medium">Events detected by PrepList Agent™ based on your location and calendar.</p>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full md:w-auto">
+                    {specialEvents.map(event => (
+                      <div key={event.id} className="bg-white/10 backdrop-blur-md border-2 border-white/20 p-6 rounded-[2rem] flex flex-col justify-center min-w-[240px]">
+                        <p className="font-black text-white text-lg tracking-tight leading-none mb-1">{event.name}</p>
+                        <p className="text-[10px] font-black text-indigo-200 uppercase tracking-widest">+{Math.round((event.coverIncrease - 1) * 100)}% Forecast Multiplier</p>
                       </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {menuItems.map(item => {
-                          const projectedUnits = Math.round(totalTargetVolume * item.productMix);
-                          const trend = item.history7Days[6] > item.history7Days[0] ? 'up' : 'down';
-                          return (
-                            <div key={item.id} className="p-6 border-2 border-slate-50 rounded-3xl hover:border-indigo-100 transition-all group relative overflow-hidden">
-                              <div className="relative z-10 space-y-4">
-                                <div className="flex justify-between items-start">
-                                  <h4 className="font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">{item.name}</h4>
-                                  <span className={`p-1.5 rounded-lg ${trend === 'up' ? 'text-emerald-500 bg-emerald-50' : 'text-rose-500 bg-rose-50'}`}>
-                                    {trend === 'up' ? '↗' : '↘'}
-                                  </span>
-                                </div>
-                                <div className="flex items-end justify-between">
-                                  <div>
-                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Projected Sale</p>
-                                    <p className="text-3xl font-black text-slate-900">{projectedUnits}</p>
-                                  </div>
-                                  <div className="text-right">
-                                    <p className="text-xs font-bold text-indigo-600">{Math.round(item.productMix * 100)}% Share</p>
-                                  </div>
-                                </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'pmix' && (
+            <div className="max-w-7xl mx-auto space-y-12 animate-in pb-20">
+              <div className="flex flex-col md:flex-row justify-between items-end gap-4 border-b-8 border-slate-900 pb-6">
+                <div>
+                   <h2 className="text-5xl font-black text-slate-900 tracking-tight uppercase">Volume Explosion Grid</h2>
+                   <p className="text-indigo-600 font-black uppercase tracking-widest text-xs">Section 5: Menu Mix Extrapolation</p>
+                </div>
+                <div className="bg-slate-900 text-white px-8 py-3 rounded-2xl font-black uppercase tracking-widest text-[10px]">
+                   Target Covers: {totalTargetVolume}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                {menuItems.map(item => (
+                  <div key={item.id} className="bg-white border-4 border-slate-900 rounded-[3rem] shadow-xl overflow-hidden group hover:shadow-2xl transition-all">
+                    <div className="p-8 bg-slate-50 border-b-4 border-slate-900 flex justify-between items-start">
+                      <p className="font-black text-slate-900 text-2xl uppercase tracking-tight leading-none">{item.name}</p>
+                      <span className="bg-indigo-600 text-white text-[10px] font-black px-4 py-1 rounded-full uppercase tracking-widest">{(item.productMix * 100).toFixed(0)}% PMix</span>
+                    </div>
+                    <div className="p-10 space-y-8">
+                       <div className="flex items-end gap-3">
+                         <p className="text-7xl font-black text-slate-950 leading-none tracking-tighter">{Math.round(totalTargetVolume * item.productMix)}</p>
+                         <p className="text-sm font-black text-slate-400 uppercase tracking-widest mb-2">Portions</p>
+                       </div>
+                       <div className="h-16 border-2 rounded-2xl p-2 bg-slate-50"><MiniTrendChart data={item.history7Days} /></div>
+                       <div className="pt-8 border-t-4 border-dotted border-slate-200 space-y-4">
+                          <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest flex items-center gap-2">
+                             <Icons.Search /> Ingredient Drag Breakdown
+                          </p>
+                          <div className="space-y-3">
+                            {item.ingredients.map(ing => (
+                              <div key={ing.prepItemId} className="flex justify-between text-sm font-black items-center">
+                                <span className="text-slate-500 uppercase tracking-tight">{prepItems.find(p => p.id === ing.prepItemId)?.name}</span>
+                                <span className="text-slate-950 bg-indigo-50 px-4 py-1.5 rounded-xl border-2 border-indigo-100 italic">{(Math.round(totalTargetVolume * item.productMix) * ing.amountPerUnit).toFixed(1)} {prepItems.find(p => p.id === ing.prepItemId)?.unit}</span>
                               </div>
-                              <div className="absolute -right-4 -bottom-4 w-24 h-24 bg-indigo-50 rounded-full opacity-0 group-hover:opacity-100 transition-all scale-0 group-hover:scale-100"></div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    {/* Ingredient Drag Analysis */}
-                    <div className="bg-white p-8 rounded-[2.5rem] border shadow-sm space-y-6">
-                      <h3 className="text-xl font-black text-slate-900 flex items-center gap-3">
-                         <span className="p-2 bg-emerald-50 text-emerald-600 rounded-xl"><Icons.ChefHat /></span>
-                         Prep Requirement Breakdown
-                      </h3>
-                      <div className="overflow-x-auto">
-                        <table className="w-full">
-                          <thead>
-                            <tr className="border-b text-left">
-                              <th className="pb-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Prep Item</th>
-                              <th className="pb-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Driven By</th>
-                              <th className="pb-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Unit Total</th>
-                              <th className="pb-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Inventory Impact</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-slate-50">
-                            {prepItems.map(prep => {
-                              // Find which menu items use this prep item
-                              const usingMenuItems = menuItems.filter(mi => 
-                                mi.ingredients.some(ing => ing.prepItemId === prep.id)
-                              );
-                              
-                              if (usingMenuItems.length === 0) return null;
-
-                              const totalUnits = usingMenuItems.reduce((sum, mi) => {
-                                const unitsOfMenu = totalTargetVolume * mi.productMix;
-                                const amtPerUnit = mi.ingredients.find(ing => ing.prepItemId === prep.id)?.amountPerUnit || 0;
-                                return sum + (unitsOfMenu * amtPerUnit);
-                              }, 0);
-
-                              return (
-                                <tr key={prep.id} className="group hover:bg-slate-50 transition-colors">
-                                  <td className="py-4">
-                                    <p className="font-bold text-slate-900">{prep.name}</p>
-                                    <p className="text-[10px] text-slate-400 uppercase font-bold">{prep.category}</p>
-                                  </td>
-                                  <td className="py-4">
-                                    <div className="flex flex-wrap gap-1">
-                                      {usingMenuItems.map(mi => (
-                                        <span key={mi.id} className="px-2 py-0.5 bg-indigo-50 text-indigo-600 rounded text-[9px] font-black uppercase">
-                                          {mi.name}
-                                        </span>
-                                      ))}
-                                    </div>
-                                  </td>
-                                  <td className="py-4 text-right">
-                                    <span className="text-lg font-black text-slate-800">{totalUnits.toFixed(1)} {prep.unit}</span>
-                                  </td>
-                                  <td className="py-4 text-right">
-                                    <div className="inline-flex items-center gap-2">
-                                      <div className="w-20 bg-slate-100 h-1.5 rounded-full overflow-hidden">
-                                        <div 
-                                          className={`h-full rounded-full ${prep.currentStock < (totalUnits * 0.5) ? 'bg-rose-500' : 'bg-emerald-500'}`} 
-                                          style={{ width: `${Math.min(100, (prep.currentStock / prep.forecastNeeded) * 100)}%` }}
-                                        ></div>
-                                      </div>
-                                      <span className="text-[10px] font-black text-slate-400">{( (prep.currentStock / prep.forecastNeeded) * 100).toFixed(0)}%</span>
-                                    </div>
-                                  </td>
-                                </tr>
-                              );
-                            })}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {activeTab === 'agent' && (
-              <div className="max-w-4xl mx-auto space-y-6 pb-10">
-                <div className="bg-white rounded-3xl border shadow-sm p-8 flex flex-col items-center relative overflow-hidden">
-                  <div className={`w-24 h-24 rounded-full flex items-center justify-center mb-4 transition-all ${isLiveActive ? 'bg-indigo-50 animate-pulse scale-110' : 'bg-slate-50'}`}>
-                    <div className="w-12 h-12 bg-indigo-600 text-white rounded-full flex items-center justify-center shadow-lg"><Icons.Bot /></div>
-                  </div>
-                  <h2 className="text-lg font-bold">Prep Agent Interface</h2>
-                  <p className="text-sm text-slate-500 mb-8">Guided conversation for meal planning & par adjustments.</p>
-                  <div className="w-full space-y-4">
-                    {transcription.map((t, i) => (
-                      <div key={i} className="space-y-4">
-                        <div className="flex justify-end"><div className="bg-indigo-600 text-white px-4 py-2 rounded-2xl rounded-tr-none text-sm max-w-[80%]">{t.user}</div></div>
-                        <div className="flex justify-start">
-                          <div className="bg-slate-100 text-slate-800 px-4 py-2 rounded-2xl rounded-tl-none text-sm max-w-[80%] border border-slate-200">
-                            {t.agent.includes('[AI SUGGESTION]') ? (
-                              <span className="block"><span className="text-[10px] font-black text-indigo-600 uppercase mb-1 block">✨ AI Suggestion</span>{t.agent.replace('[AI SUGGESTION]', '')}</span>
-                            ) : t.agent}
+                            ))}
                           </div>
-                        </div>
-                      </div>
-                    ))}
-                    {currentAgentText && <div className="text-xs text-slate-400 italic">Agent is typing...</div>}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {activeTab === 'inventory' && (
-              <div className="bg-white border rounded-2xl shadow-sm overflow-visible animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-5xl mx-auto pb-10">
-                 <div className="p-6 border-b flex justify-between items-center bg-slate-50 rounded-t-2xl">
-                  <h3 className="font-bold text-slate-900">Inventory Status <Tooltip what="Current counts." source="IMS Sync." why="Baseline logic." align="left" /></h3>
-                  <button className="text-sm bg-white border border-slate-200 px-3 py-1.5 rounded-lg font-semibold hover:bg-slate-50 transition-colors shadow-sm">Manual Update</button>
-                </div>
-                <div className="divide-y overflow-visible">
-                  {inventory.map(item => (
-                    <div key={item.id} className="p-6 flex justify-between items-center hover:bg-slate-50">
-                      <div>
-                        <p className="font-bold text-slate-900">{item.name}</p>
-                        <p className="text-xs text-slate-500">{item.category}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className={`font-bold ${item.currentStock < item.threshold ? 'text-rose-600' : 'text-slate-700'}`}>
-                          {item.currentStock} / {item.threshold} {item.unit}
-                        </p>
-                      </div>
+                       </div>
                     </div>
-                  ))}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'help' && (
+            <div className="max-w-5xl mx-auto space-y-16 animate-in pb-20">
+              <div className="text-center space-y-4 border-b-8 border-slate-900 pb-10">
+                <h2 className="text-6xl font-black text-slate-900 tracking-tighter uppercase">Operations Hub</h2>
+                <p className="text-slate-700 text-xl font-bold italic">Mastering the Deterministic Logic Framework</p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                <div className="bg-indigo-50 p-12 rounded-[4rem] border-4 border-indigo-600 shadow-xl space-y-8">
+                  <div className="w-20 h-20 bg-indigo-600 text-white rounded-3xl flex items-center justify-center shadow-lg"><Icons.Trend /></div>
+                  <h4 className="text-3xl font-black text-indigo-900 uppercase tracking-tight leading-none italic">How Pars are Calculated</h4>
+                  <p className="text-indigo-800 font-medium leading-relaxed">PrepList Agent™ uses a 100% traceable engine. We never hide the 'why' behind a par level.</p>
+                  <ul className="space-y-4">
+                    {[
+                      { l: "Base Demand", v: "Derived from Daypart volume targets." },
+                      { l: "DOW Multiplier", v: "Applies weekday-specific scaling (e.g., 1.3x Saturday)." },
+                      { l: "Buffer Logic", v: "Safety pars based on ingredient category (Protein/Produce)." },
+                      { l: "Inventory Offset", v: "Net reduction based on verified morning counts." }
+                    ].map((row, i) => (
+                      <li key={i} className="flex justify-between items-center p-5 bg-white rounded-2xl border-2 border-indigo-100">
+                        <span className="font-black text-indigo-900 uppercase text-xs tracking-widest">{row.l}</span>
+                        <span className="text-indigo-600 font-black">{row.v}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                <div className="bg-rose-50 p-12 rounded-[4rem] border-4 border-rose-600 shadow-xl space-y-8">
+                  <div className="w-20 h-20 bg-rose-600 text-white rounded-3xl flex items-center justify-center shadow-lg"><Icons.Trash /></div>
+                  <h4 className="text-3xl font-black text-rose-900 uppercase tracking-tight leading-none italic">The Learning Loop</h4>
+                  <p className="text-rose-800 font-medium leading-relaxed">Logged waste events directly influence tomorrow's production pars to stabilize food cost variance.</p>
+                  <div className="space-y-6">
+                    <div className="p-6 bg-white rounded-3xl border-2 border-rose-100 shadow-sm">
+                      <p className="text-[11px] font-black text-rose-600 uppercase mb-2 tracking-[0.2em]">High Waste Override</p>
+                      <p className="text-slate-900 font-bold leading-snug text-lg">If Waste > 25% of prep, system forces a 20% reduction across the next 3 days.</p>
+                    </div>
+                    <div className="p-6 bg-white rounded-3xl border-2 border-emerald-100 shadow-sm">
+                      <p className="text-[11px] font-black text-emerald-600 uppercase mb-2 tracking-[0.2em]">Low Stock Override</p>
+                      <p className="text-slate-900 font-bold leading-snug text-lg">If an item '86s' before service end, pars are boosted by 15% for the next cycle.</p>
+                    </div>
+                  </div>
                 </div>
               </div>
-            )}
 
-            {activeTab === 'help' && (
-              <div className="max-w-4xl mx-auto space-y-12 animate-in fade-in duration-500 pb-20">
-                <div className="text-center">
-                  <h2 className="text-4xl font-black text-slate-900 mb-4">How to use PrepList Agent™</h2>
-                  <p className="text-slate-500 max-w-2xl mx-auto">Master the deterministic kitchen intelligence system to reduce waste and boost efficiency.</p>
+              <div className="space-y-8 pt-10">
+                 <h3 className="text-4xl font-black text-slate-900 px-4 uppercase tracking-tighter italic">FAQ - Common Scenarios</h3>
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                   {[
+                     { q: "What is an 'Assigned To' task?", a: "Prep lists can be split by staff member. These sync in real-time to mobile tablets on the line." },
+                     { q: "How are knife skills weighted?", a: "Tasks are graded 1-10. PrepList Agent™ suggests complex butchery tasks for your senior line cooks first." },
+                     { q: "Can I adjust multipliers manually?", a: "Yes, use the Voice Interface to say 'Boost protein pars by 10% today'—the Agent will update all relevant items." },
+                     { q: "Is this integrated with my POS?", a: "By default, yes. If Toast or NCR sync fails, the system falls back to historical day-of-week averages." }
+                   ].map((faq, i) => (
+                     <div key={i} className="bg-white p-10 rounded-[3rem] border-4 border-slate-100 shadow-lg hover:border-indigo-600 transition-all">
+                       <p className="font-black text-slate-950 text-xl mb-4 leading-tight uppercase tracking-tight">{faq.q}</p>
+                       <p className="text-slate-600 font-medium leading-relaxed">{faq.a}</p>
+                     </div>
+                   ))}
+                 </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'waste' && (
+            <div className="max-w-6xl mx-auto space-y-12 animate-in pb-20">
+              <div className="flex flex-col md:flex-row justify-between items-end gap-6 border-b-8 border-slate-900 pb-8">
+                <div>
+                   <h2 className="text-6xl font-black text-slate-900 tracking-tight uppercase">Waste Analysis</h2>
+                   <p className="text-rose-600 font-black uppercase tracking-widest text-xs">Section 6: Adaptive Correction Engine</p>
                 </div>
+                <button onClick={() => setShowWasteForm(true)} className="bg-rose-600 text-white px-10 py-5 rounded-[2rem] font-black text-lg shadow-2xl hover:bg-rose-700 transition-all active:scale-95">Log Waste Event</button>
+              </div>
 
-                <div className="space-y-8">
-                  <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest border-b pb-4">Module Instructions</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {[
-                      { title: 'Dashboard', icon: <Icons.Dashboard />, text: 'View high-level restaurant health. Monitor low-stock alerts and historical sales trends at a glance.' },
-                      { title: 'Daily Inputs', icon: <Icons.Search />, text: 'CRITICAL: Enter projected meal volume and average checks for each daypart. Add special events to apply multipliers.' },
-                      { title: 'Prep List', icon: <Icons.ChefHat />, text: 'Your actionable tasks grouped by station. Mark items as in-progress or completed as you work.' },
-                      { title: 'P-Mix Analysis', icon: <Icons.Trend />, text: 'See which menu items are driving prep needs based on historical POS sales data and trends.' },
-                      { title: 'Inventory', icon: <Icons.Inventory />, text: 'Live sync with your IMS. Shows current stock vs thresholds to ensure you never run out.' },
-                      { title: 'Waste Tracking', icon: <Icons.Trash />, text: 'Log over-prepped items. The engine uses this data to automatically reduce future prep volumes.' }
-                    ].map((help, i) => (
-                      <div key={i} className="bg-white p-6 rounded-3xl border shadow-sm flex gap-4">
-                        <div className="bg-indigo-50 text-indigo-600 p-3 rounded-2xl h-fit">{help.icon}</div>
+              {showWasteForm && (
+                <div className="bg-white border-8 border-rose-600 rounded-[4rem] p-12 shadow-[0_35px_60px_-15px_rgba(225,29,72,0.3)] space-y-10 animate-in zoom-in duration-300 relative z-40">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
+                    <div className="space-y-3">
+                      <label className="text-xs font-black text-slate-950 uppercase tracking-widest block">Item Name</label>
+                      <select className="w-full bg-slate-50 border-4 border-slate-950 rounded-[1.5rem] px-6 py-5 text-xl font-black text-black outline-none focus:bg-white" onChange={(e) => setNewWaste({...newWaste, itemName: e.target.value})}>
+                        <option value="">Select Item...</option>
+                        {prepItems.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
+                      </select>
+                    </div>
+                    <div className="space-y-3">
+                      <label className="text-xs font-black text-slate-950 uppercase tracking-widest block">Logged Qty (kg)</label>
+                      <input type="number" className="w-full bg-slate-50 border-4 border-slate-950 rounded-[1.5rem] px-6 py-5 text-xl font-black text-black outline-none focus:bg-white" placeholder="0.0" onChange={(e) => setNewWaste({...newWaste, quantity: Number(e.target.value)})} />
+                    </div>
+                    <div className="space-y-3">
+                      <label className="text-xs font-black text-slate-950 uppercase tracking-widest block">Reason Code</label>
+                      <select className="w-full bg-slate-50 border-4 border-slate-950 rounded-[1.5rem] px-6 py-5 text-xl font-black text-black outline-none focus:bg-white" onChange={(e) => setNewWaste({...newWaste, reasonCode: (e.target.value as WasteReasonCode)})}>
+                        <option value="OVERPRODUCTION">OVERPRODUCTION</option>
+                        <option value="SPOILAGE">SPOILAGE</option>
+                        <option value="PREP_ERROR">PREP_ERROR</option>
+                        <option value="STORAGE">STORAGE</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div className="flex justify-end gap-5">
+                    <button onClick={() => setShowWasteForm(false)} className="text-slate-500 font-black uppercase text-sm px-8">Cancel</button>
+                    <button onClick={logWasteEntry} className="bg-slate-900 text-white px-12 py-5 rounded-[2rem] font-black text-lg hover:bg-rose-600 transition-colors shadow-xl">Commit to Ledger</button>
+                  </div>
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                <div className="bg-slate-950 p-12 rounded-[4rem] text-white space-y-2">
+                  <p className="text-slate-500 font-black uppercase tracking-widest text-[11px]">Period Loss Impact</p>
+                  <p className="text-8xl font-black tracking-tighter text-rose-500 italic leading-none">${totalWasteCost.toFixed(2)}</p>
+                  <p className="text-slate-400 font-medium pt-4">Calculated across {wasteLogs.length} recent events.</p>
+                </div>
+                <div className="bg-white border-4 border-slate-900 p-10 rounded-[4rem] space-y-6">
+                  <p className="font-black text-slate-950 uppercase tracking-widest text-[11px] border-b-2 border-slate-100 pb-4">Recent Entry Logs</p>
+                  <div className="space-y-5 max-h-[300px] overflow-y-auto pr-4 custom-scrollbar">
+                    {wasteLogs.map(log => (
+                      <div key={log.id} className="flex justify-between items-center p-6 bg-slate-50 rounded-[2rem] border-2 border-slate-100 hover:border-rose-200 transition-colors">
                         <div>
-                          <h4 className="font-bold text-slate-900 mb-1">{help.title}</h4>
-                          <p className="text-sm text-slate-500 leading-relaxed">{help.text}</p>
+                          <p className="font-black text-slate-900 text-lg uppercase leading-none mb-1">{log.itemName}</p>
+                          <p className="text-[10px] font-black text-rose-500 uppercase tracking-widest">{log.reasonCode} • {log.shift} Shift</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-black text-slate-950 text-xl leading-none">-{log.quantity} {log.unit}</p>
+                          <p className="text-[11px] font-black text-slate-400 uppercase tracking-tight italic">Cost: ${log.totalCost.toFixed(2)}</p>
                         </div>
                       </div>
                     ))}
                   </div>
                 </div>
-
-                <div className="space-y-6">
-                  <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest border-b pb-4">Frequently Asked Questions</h3>
-                  <div className="space-y-4">
-                    {[
-                      { q: 'How is the Prep Needed value calculated?', a: 'Our engine uses a deterministic formula: (Base Cover Target / Historical Avg) * Item Forecast * Weekend/Weekday Multiplier * Station Buffer. It then subtracts current stock.' },
-                      { q: 'What are Special Event Flags?', a: 'Manual overrides for local events (e.g., Farmers Markets). They apply a percentage multiplier to your base covers to account for expected spikes.' },
-                      { q: 'Does the Prep Agent learn from my kitchen?', a: 'Yes. By logging waste data, the AI identifies over-prepping patterns and suggests adjustments to your rules to save on food costs.' },
-                      { q: 'How do I mark an item as 86\'d?', a: 'Navigate to Inventory and update the manual count to zero. The Prep Agent will flag the item as critical on the Dashboard.' }
-                    ].map((faq, i) => (
-                      <div key={i} className="bg-slate-50 p-6 rounded-3xl border border-slate-100">
-                        <p className="font-bold text-slate-900 mb-2">Q: {faq.q}</p>
-                        <p className="text-sm text-slate-600 leading-relaxed">A: {faq.a}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="bg-indigo-600 rounded-[2rem] p-10 text-white text-center shadow-2xl shadow-indigo-100 relative overflow-hidden">
-                  <div className="relative z-10">
-                    <h3 className="text-2xl font-black mb-4">Still need assistance?</h3>
-                    <p className="opacity-80 mb-8 max-w-lg mx-auto">Chef Anthony is available for 1-on-1 kitchen workflow optimization. Use the Prep Agent voice interface to ask specific tactical questions.</p>
-                    <button onClick={() => setActiveTab('agent')} className="bg-white text-indigo-600 px-8 py-3 rounded-full font-black hover:bg-indigo-50 transition-colors">Talk to Prep Agent</button>
-                  </div>
-                  <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500 rounded-full -mr-20 -mt-20 blur-3xl opacity-30"></div>
-                  <div className="absolute bottom-0 left-0 w-64 h-64 bg-indigo-400 rounded-full -ml-20 -mb-20 blur-3xl opacity-20"></div>
-                </div>
               </div>
-            )}
-          </div>
+            </div>
+          )}
 
-          <footer className="mt-auto pt-8 pb-12 md:pb-8 border-t border-slate-200">
-            <div className="flex flex-col md:flex-row items-center justify-between gap-4 text-[11px] font-bold text-slate-400 uppercase tracking-widest">
-              <div className="flex items-center gap-2">
-                <span>© 2026 FohBoh.ai, Inc.</span>
-                <span className="text-slate-300">|</span>
-                <span className="flex items-center gap-1">Powered by <span className="text-indigo-600">FohBoh.ai</span></span>
+          <footer className="mt-auto pt-20 pb-12 border-t-4 border-slate-900">
+            <div className="flex flex-col md:flex-row items-center justify-between gap-8 text-[12px] font-black text-slate-950 uppercase tracking-[0.3em]">
+              <div className="flex items-center gap-4">
+                <span className="bg-slate-900 text-white px-3 py-1 rounded">FOHBOH</span>
+                <span>© 2026. All Rights Reserved.</span>
               </div>
-              <div className="flex items-center gap-6">
-                <a href="#" className="hover:text-indigo-600 transition-colors">Contact Us</a>
-                <a href="#" className="hover:text-indigo-600 transition-colors">Privacy Policy</a>
-                <a href="#" className="hover:text-indigo-600 transition-colors">Terms of Service</a>
+              <div className="flex items-center gap-10">
+                <a href="#" className="hover:text-indigo-600 transition-colors">Documentation</a>
+                <a href="#" className="hover:text-indigo-600 transition-colors">Privacy</a>
+                <a href="#" className="hover:text-indigo-600 transition-colors">Terms</a>
               </div>
             </div>
           </footer>
         </div>
         
-        <div className="md:hidden bg-white border-t flex justify-around p-3 pb-6 shrink-0 z-50">
-          <button onClick={() => setActiveTab('home')} className={activeTab === 'home' ? 'text-indigo-600' : 'text-slate-400'}><Icons.Dashboard /></button>
-          <button onClick={() => setActiveTab('get-started')} className={activeTab === 'get-started' ? 'text-emerald-500' : 'text-slate-400'}><Icons.Check /></button>
-          <button onClick={() => setActiveTab('inputs')} className={activeTab === 'inputs' ? 'text-indigo-600' : 'text-slate-400'}><Icons.Search /></button>
-          <button onClick={() => setActiveTab('preplist')} className={activeTab === 'preplist' ? 'text-indigo-600' : 'text-slate-400'}><Icons.ChefHat /></button>
-          <button onClick={() => setActiveTab('agent')} className={activeTab === 'agent' ? 'text-indigo-600 scale-125' : 'text-slate-400'}><Icons.Bot /></button>
+        <div className="md:hidden bg-slate-900 border-t flex justify-around p-4 pb-8 shrink-0 z-50">
+          <button onClick={() => setActiveTab('home')} className={`p-4 rounded-2xl ${activeTab === 'home' ? 'bg-indigo-600 text-white' : 'text-slate-400'}`}><Icons.Dashboard /></button>
+          <button onClick={() => setActiveTab('preplist')} className={`p-4 rounded-2xl ${activeTab === 'preplist' ? 'bg-indigo-600 text-white' : 'text-slate-400'}`}><Icons.ChefHat /></button>
+          <button onClick={() => setActiveTab('waste')} className={`p-4 rounded-2xl ${activeTab === 'waste' ? 'bg-indigo-600 text-white' : 'text-slate-400'}`}><Icons.Trash /></button>
+          <button onClick={() => setActiveTab('agent')} className={`p-4 rounded-2xl ${activeTab === 'agent' ? 'bg-indigo-600 text-white' : 'text-slate-400'}`}><Icons.Bot /></button>
         </div>
       </main>
-      
+
       <style>{`
-        @keyframes shimmer { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
-        .animate-in { animation: fadeIn 0.4s ease-out; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        .animate-in { animation: fadeIn 0.8s cubic-bezier(0.16, 1, 0.3, 1); }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
       `}</style>
     </div>
   );

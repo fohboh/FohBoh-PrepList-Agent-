@@ -6,27 +6,32 @@ export const INITIAL_PREP_ITEMS: PrepItem[] = [
   { 
     id: '1', name: 'Diced Onions', category: 'Produce', station: 'Garde Manger', unit: 'kg', 
     currentStock: 0.5, forecastNeeded: 5.0, prepNeeded: 4.5, status: 'Pending', 
-    priority: 'Medium', dueBy: '10:30 AM', shelfLifeDays: 2, requiresKnifeSkills: 4, costPerUnit: 1.20 
+    priority: 'Medium', dueBy: '10:30 AM', shelfLifeDays: 2, requiresKnifeSkills: 4, 
+    costPerUnit: 1.20, itemCriticality: 5, prepTimeMinutes: 15 
   },
   { 
     id: '2', name: 'Marinated Chicken', category: 'Protein', station: 'Butchery', unit: 'kg', 
     currentStock: 2.0, forecastNeeded: 12.0, prepNeeded: 10.0, status: 'In-Progress', 
-    priority: 'High', assignedTo: 'Marco', dueBy: '11:30 AM', shelfLifeDays: 3, requiresKnifeSkills: 7, costPerUnit: 8.50 
+    priority: 'High', assignedTo: 'Marco', dueBy: '11:30 AM', shelfLifeDays: 3, 
+    requiresKnifeSkills: 7, costPerUnit: 8.50, itemCriticality: 10, prepTimeMinutes: 45 
   },
   { 
     id: '3', name: 'House Balsamic', category: 'Sauce', station: 'General Prep', unit: 'L', 
     currentStock: 0.8, forecastNeeded: 2.0, prepNeeded: 1.2, status: 'Completed', 
-    priority: 'Medium', dueBy: '10:00 AM', shelfLifeDays: 7, requiresKnifeSkills: 2, costPerUnit: 4.50 
+    priority: 'Medium', dueBy: '10:00 AM', shelfLifeDays: 7, 
+    requiresKnifeSkills: 2, costPerUnit: 4.50, itemCriticality: 8, prepTimeMinutes: 20 
   },
   { 
     id: '4', name: 'Shredded Romaine', category: 'Produce', station: 'Garde Manger', unit: 'heads', 
     currentStock: 1.0, forecastNeeded: 8.0, prepNeeded: 7.0, status: 'Pending', 
-    priority: 'High', dueBy: '11:00 AM', shelfLifeDays: 1, requiresKnifeSkills: 3, costPerUnit: 0.95 
+    priority: 'High', dueBy: '11:00 AM', shelfLifeDays: 1, 
+    requiresKnifeSkills: 3, costPerUnit: 0.95, itemCriticality: 5, prepTimeMinutes: 10 
   },
   { 
     id: '5', name: 'NY Strip Steaks', category: 'Protein', station: 'Butchery', unit: 'portions', 
     currentStock: 5.0, forecastNeeded: 30.0, prepNeeded: 25.0, status: 'Pending', 
-    priority: 'High', dueBy: '12:00 PM', shelfLifeDays: 3, requiresKnifeSkills: 9, costPerUnit: 14.00 
+    priority: 'High', dueBy: '12:00 PM', shelfLifeDays: 3, 
+    requiresKnifeSkills: 9, costPerUnit: 14.00, itemCriticality: 10, prepTimeMinutes: 60 
   }
 ];
 

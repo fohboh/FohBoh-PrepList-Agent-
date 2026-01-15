@@ -15,6 +15,8 @@ export interface PrepItem {
   shelfLifeDays: number;
   requiresKnifeSkills: number; // 1-10
   costPerUnit: number;
+  itemCriticality: number; // 1-10 (Star Item = 10)
+  prepTimeMinutes: number;
   whyExplanation?: string;
 }
 
