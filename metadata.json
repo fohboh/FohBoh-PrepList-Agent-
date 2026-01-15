@@ -1,0 +1,8 @@
+{
+  "name": "FohBoh PrepList Agent™",
+  "description": "An intelligent voice-enabled kitchen management system that auto-generates daily prep lists through guided conversation.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
