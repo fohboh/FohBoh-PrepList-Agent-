@@ -225,473 +225,489 @@ const App: React.FC = () => {
           </button>
         </header>
 
-        <div className="flex-1 overflow-y-auto p-4 md:p-8 space-y-8">
-          
-          {activeTab === 'home' && (
-            <div className="max-w-6xl mx-auto space-y-16 animate-in fade-in duration-700 pb-20">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center mt-8">
-                <div className="space-y-6">
-                  <div className="inline-block bg-indigo-50 text-indigo-700 px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-widest border border-indigo-100">Welcome to FohBoh™</div>
-                  <h2 className="text-5xl md:text-6xl font-black text-slate-900 leading-[1.1]">The Future of <span className="text-indigo-600">Kitchen Execution.</span></h2>
-                  <p className="text-lg text-slate-500 max-w-lg leading-relaxed">PrepList Agent™ combines deterministic rules with AI-driven sales forecasting to ensure your kitchen is always ready, never over-prepped, and perfectly synchronized.</p>
-                  <div className="flex flex-wrap gap-4 pt-4">
-                    <button onClick={() => setActiveTab('get-started')} className="bg-emerald-500 hover:bg-emerald-600 text-white px-8 py-4 rounded-2xl font-black shadow-xl shadow-emerald-100 transition-all flex items-center gap-3 active:scale-95">Get Started Now <Icons.Check /></button>
-                    <button onClick={() => setActiveTab('dashboard')} className="bg-white border-2 border-slate-200 text-slate-900 px-8 py-4 rounded-2xl font-black hover:bg-slate-50 transition-all active:scale-95">View Dashboard</button>
+        <div className="flex-1 overflow-y-auto p-4 md:p-8 space-y-8 flex flex-col">
+          <div className="flex-1">
+            {activeTab === 'home' && (
+              <div className="max-w-6xl mx-auto space-y-16 animate-in fade-in duration-700 pb-10">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center mt-8">
+                  <div className="space-y-6">
+                    <div className="inline-block bg-indigo-50 text-indigo-700 px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-widest border border-indigo-100">Welcome to FohBoh™</div>
+                    <h2 className="text-5xl md:text-6xl font-black text-slate-900 leading-[1.1]">The Future of <span className="text-indigo-600">Kitchen Execution.</span></h2>
+                    <p className="text-lg text-slate-500 max-w-lg leading-relaxed">PrepList Agent™ combines deterministic rules with AI-driven sales forecasting to ensure your kitchen is always ready, never over-prepped, and perfectly synchronized.</p>
+                    <div className="flex flex-wrap gap-4 pt-4">
+                      <button onClick={() => setActiveTab('get-started')} className="bg-emerald-500 hover:bg-emerald-600 text-white px-8 py-4 rounded-2xl font-black shadow-xl shadow-emerald-100 transition-all flex items-center gap-3 active:scale-95">Get Started Now <Icons.Check /></button>
+                      <button onClick={() => setActiveTab('dashboard')} className="bg-white border-2 border-slate-200 text-slate-900 px-8 py-4 rounded-2xl font-black hover:bg-slate-50 transition-all active:scale-95">View Dashboard</button>
+                    </div>
                   </div>
-                </div>
-                <div className="relative">
-                  <div className="aspect-square bg-indigo-600/5 rounded-[3rem] p-8 flex items-center justify-center relative overflow-hidden">
-                    <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-600 rounded-full blur-[100px] opacity-10"></div>
-                    <div className="bg-white rounded-3xl shadow-2xl p-6 border-2 border-indigo-50 w-full relative z-10 transform -rotate-3 hover:rotate-0 transition-transform duration-500">
-                      <div className="flex justify-between items-center mb-6">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 bg-indigo-100 rounded-xl flex items-center justify-center text-indigo-600 font-black">AI</div>
-                          <div>
-                            <p className="font-bold text-slate-900">Agent Analysis</p>
-                            <p className="text-[10px] text-slate-400 font-black">RECOMMENDATION</p>
+                  <div className="relative">
+                    <div className="aspect-square bg-indigo-600/5 rounded-[3rem] p-8 flex items-center justify-center relative overflow-hidden">
+                      <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-600 rounded-full blur-[100px] opacity-10"></div>
+                      <div className="bg-white rounded-3xl shadow-2xl p-6 border-2 border-indigo-50 w-full relative z-10 transform -rotate-3 hover:rotate-0 transition-transform duration-500">
+                        <div className="flex justify-between items-center mb-6">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 bg-indigo-100 rounded-xl flex items-center justify-center text-indigo-600 font-black">AI</div>
+                            <div>
+                              <p className="font-bold text-slate-900">Agent Analysis</p>
+                              <p className="text-[10px] text-slate-400 font-black">RECOMMENDATION</p>
+                            </div>
                           </div>
+                          <div className="px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full text-[10px] font-black tracking-tighter uppercase">99% Confidence</div>
                         </div>
-                        <div className="px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full text-[10px] font-black tracking-tighter uppercase">99% Confidence</div>
+                        <p className="text-sm text-slate-600 italic leading-relaxed">"Based on the Downtown Farmers Market event tomorrow, I've increased 'Diced Onions' prep by 15%. This matches your historical 20% spike during similar events."</p>
                       </div>
-                      <p className="text-sm text-slate-600 italic leading-relaxed">"Based on the Downtown Farmers Market event tomorrow, I've increased 'Diced Onions' prep by 15%. This matches your historical 20% spike during similar events."</p>
                     </div>
                   </div>
                 </div>
-              </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                {[
-                  { title: "Reduce Waste", desc: "Automated adjustments based on historical overprep logs.", icon: <Icons.Trash />, color: "bg-rose-50 text-rose-600" },
-                  { title: "Boost Efficiency", desc: "Station-specific tasks sorted by priority and knife-skill level.", icon: <Icons.ChefHat />, color: "bg-indigo-50 text-indigo-600" },
-                  { title: "Deterministic Logic", desc: "Hard rules paired with AI insights for 100% reliable pars.", icon: <Icons.Dashboard />, color: "bg-emerald-50 text-emerald-600" }
-                ].map((feature, i) => (
-                  <div key={i} className="bg-white p-8 rounded-3xl border border-slate-100 shadow-sm hover:shadow-xl transition-all group">
-                    <div className={`w-14 h-14 ${feature.color} rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform`}>{feature.icon}</div>
-                    <h4 className="text-xl font-bold text-slate-900 mb-2">{feature.title}</h4>
-                    <p className="text-slate-500 text-sm leading-relaxed">{feature.desc}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'get-started' && (
-            <div className="max-w-4xl mx-auto space-y-12 animate-in fade-in duration-500 pb-20">
-              <div className="text-center space-y-4">
-                <h2 className="text-4xl font-black text-slate-900">Complete Your PrepList</h2>
-                <p className="text-slate-500 text-lg">Follow these 4 steps to synchronize your kitchen for today's service.</p>
-              </div>
-
-              <div className="relative space-y-12 before:absolute before:left-8 before:top-8 before:bottom-8 before:w-1 before:bg-slate-100 before:-z-10">
-                {[
-                  { 
-                    step: 1, 
-                    title: "Configure Daily Forecast", 
-                    desc: "Enter your projected meal counts and average checks for each daypart. Add any local events that might spike traffic.",
-                    tab: "inputs",
-                    icon: <Icons.Search />,
-                    action: "Go to Inputs"
-                  },
-                  { 
-                    step: 2, 
-                    title: "Sync Inventory Levels", 
-                    desc: "Ensure your current counts in the system match your walk-in shelf reality. AI uses this 'On-Hand' delta for prep targets.",
-                    tab: "inventory",
-                    icon: <Icons.Inventory />,
-                    action: "Verify Inventory"
-                  },
-                  { 
-                    step: 3, 
-                    title: "Review & Adjust Prep Needs", 
-                    desc: "The engine automatically explodes your P-Mix across your cover target. Review station assignments and AI suggestions.",
-                    tab: "preplist",
-                    icon: <Icons.ChefHat />,
-                    action: "Review Prep List"
-                  },
-                  { 
-                    step: 4, 
-                    title: "Execute & Mark Complete", 
-                    desc: "Hand off the digital list to your team. As they complete tasks, track completion in real-time on your dashboard.",
-                    tab: "dashboard",
-                    icon: <Icons.Dashboard />,
-                    action: "Go to Dashboard"
-                  }
-                ].map((item, i) => (
-                  <div key={i} className="flex gap-8 items-start animate-in fade-in slide-in-from-left-4" style={{ animationDelay: `${i * 100}ms` }}>
-                    <div className="w-16 h-16 rounded-full bg-white border-4 border-emerald-500 flex items-center justify-center text-emerald-500 font-black text-xl shadow-lg shrink-0">
-                      {item.step}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                  {[
+                    { title: "Reduce Waste", desc: "Automated adjustments based on historical overprep logs.", icon: <Icons.Trash />, color: "bg-rose-50 text-rose-600" },
+                    { title: "Boost Efficiency", desc: "Station-specific tasks sorted by priority and knife-skill level.", icon: <Icons.ChefHat />, color: "bg-indigo-50 text-indigo-600" },
+                    { title: "Deterministic Logic", desc: "Hard rules paired with AI insights for 100% reliable pars.", icon: <Icons.Dashboard />, color: "bg-emerald-50 text-emerald-600" }
+                  ].map((feature, i) => (
+                    <div key={i} className="bg-white p-8 rounded-3xl border border-slate-100 shadow-sm hover:shadow-xl transition-all group">
+                      <div className={`w-14 h-14 ${feature.color} rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform`}>{feature.icon}</div>
+                      <h4 className="text-xl font-bold text-slate-900 mb-2">{feature.title}</h4>
+                      <p className="text-slate-500 text-sm leading-relaxed">{feature.desc}</p>
                     </div>
-                    <div className="bg-white p-8 rounded-3xl border shadow-sm flex-1 hover:border-emerald-500 transition-colors group">
-                      <div className="flex items-center gap-3 mb-2">
-                        <div className="text-slate-400 group-hover:text-emerald-500 transition-colors">{item.icon}</div>
-                        <h4 className="text-xl font-bold text-slate-900">{item.title}</h4>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'get-started' && (
+              <div className="max-w-4xl mx-auto space-y-12 animate-in fade-in duration-500 pb-10">
+                <div className="text-center space-y-4">
+                  <h2 className="text-4xl font-black text-slate-900">Complete Your PrepList</h2>
+                  <p className="text-slate-500 text-lg">Follow these 4 steps to synchronize your kitchen for today's service.</p>
+                </div>
+
+                <div className="relative space-y-12 before:absolute before:left-8 before:top-8 before:bottom-8 before:w-1 before:bg-slate-100 before:-z-10">
+                  {[
+                    { 
+                      step: 1, 
+                      title: "Configure Daily Forecast", 
+                      desc: "Enter your projected meal volume and average checks for each daypart. Add any local events that might spike traffic.",
+                      tab: "inputs",
+                      icon: <Icons.Search />,
+                      action: "Go to Inputs"
+                    },
+                    { 
+                      step: 2, 
+                      title: "Sync Inventory Levels", 
+                      desc: "Ensure your current counts in the system match your walk-in shelf reality. AI uses this 'On-Hand' delta for prep targets.",
+                      tab: "inventory",
+                      icon: <Icons.Inventory />,
+                      action: "Verify Inventory"
+                    },
+                    { 
+                      step: 3, 
+                      title: "Review & Adjust Prep Needs", 
+                      desc: "The engine automatically explodes your P-Mix across your cover target. Review station assignments and AI suggestions.",
+                      tab: "preplist",
+                      icon: <Icons.ChefHat />,
+                      action: "Review Prep List"
+                    },
+                    { 
+                      step: 4, 
+                      title: "Execute & Mark Complete", 
+                      desc: "Hand off the digital list to your team. As they complete tasks, track completion in real-time on your dashboard.",
+                      tab: "dashboard",
+                      icon: <Icons.Dashboard />,
+                      action: "Go to Dashboard"
+                    }
+                  ].map((item, i) => (
+                    <div key={i} className="flex gap-8 items-start animate-in fade-in slide-in-from-left-4" style={{ animationDelay: `${i * 100}ms` }}>
+                      <div className="w-16 h-16 rounded-full bg-white border-4 border-emerald-500 flex items-center justify-center text-emerald-500 font-black text-xl shadow-lg shrink-0">
+                        {item.step}
                       </div>
-                      <p className="text-slate-500 text-sm leading-relaxed mb-6">{item.desc}</p>
-                      <button onClick={() => setActiveTab(item.tab)} className="bg-slate-900 text-white px-6 py-2.5 rounded-xl text-sm font-bold hover:bg-indigo-600 transition-colors flex items-center gap-2 group/btn">
-                        {item.action}
-                        <Icons.Trend />
-                      </button>
+                      <div className="bg-white p-8 rounded-3xl border shadow-sm flex-1 hover:border-emerald-500 transition-colors group">
+                        <div className="flex items-center gap-3 mb-2">
+                          <div className="text-slate-400 group-hover:text-emerald-500 transition-colors">{item.icon}</div>
+                          <h4 className="text-xl font-bold text-slate-900">{item.title}</h4>
+                        </div>
+                        <p className="text-slate-500 text-sm leading-relaxed mb-6">{item.desc}</p>
+                        <button onClick={() => setActiveTab(item.tab)} className="bg-slate-900 text-white px-6 py-2.5 rounded-xl text-sm font-bold hover:bg-indigo-600 transition-colors flex items-center gap-2 group/btn">
+                          {item.action}
+                          <Icons.Trend />
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-          
-          {activeTab === 'dashboard' && (
-            <div className="space-y-6 max-w-7xl mx-auto animate-in fade-in duration-500">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="bg-white p-6 rounded-3xl border shadow-sm relative overflow-visible">
-                   <h3 className="text-slate-500 text-sm font-medium mb-1">Low Stock Alerts <Tooltip what="Ingredients below Par Levels." source="IMS Counts." why="Prevents 86ing items." align="left" /></h3>
-                   <p className="text-3xl font-bold text-slate-900">3 Items</p>
-                </div>
-                <div className="bg-white p-6 rounded-3xl border shadow-sm overflow-visible">
-                   <h3 className="text-slate-500 text-sm font-medium mb-1">Daily Sales Forecast <Tooltip what="Projected revenue calculation." source="Meals x Avg Check." why="Staffing and production targets." align="center" /></h3>
-                   <p className="text-3xl font-bold text-slate-900">${totalSalesForecast.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
-                </div>
-                <div className="bg-white p-6 rounded-3xl border shadow-sm overflow-visible">
-                   <h3 className="text-slate-500 text-sm font-medium mb-1">Waste (OVERPREP) <Tooltip what="Items discarded due to high par levels." source="Waste Sheets." why="Signals need for rule adjustments." align="right" /></h3>
-                   <p className="text-3xl font-bold text-rose-600">$142.50</p>
+                  ))}
                 </div>
               </div>
-
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div className="lg:col-span-2 bg-white p-6 rounded-3xl border shadow-sm overflow-visible">
-                  <div className="flex flex-col md:flex-row md:items-end justify-between mb-6 gap-4">
-                    <h3 className="font-bold text-slate-900">Historical Demand Visualization <Tooltip what="Actual vs Predicted Sales." source="POS data." why="AI and Rules verification." align="left" /></h3>
+            )}
+            
+            {activeTab === 'dashboard' && (
+              <div className="space-y-6 max-w-7xl mx-auto animate-in fade-in duration-500 pb-10">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="bg-white p-6 rounded-3xl border shadow-sm relative overflow-visible">
+                     <h3 className="text-slate-500 text-sm font-medium mb-1">Low Stock Alerts <Tooltip what="Ingredients below Par Levels." source="IMS Counts." why="Prevents 86ing items." align="left" /></h3>
+                     <p className="text-3xl font-bold text-slate-900">3 Items</p>
                   </div>
-                  <ForecastChart data={MOCK_FORECAST} />
+                  <div className="bg-white p-6 rounded-3xl border shadow-sm overflow-visible">
+                     <h3 className="text-slate-500 text-sm font-medium mb-1">Daily Sales Forecast <Tooltip what="Projected revenue calculation." source="Meals x Avg Check." why="Staffing and production targets." align="center" /></h3>
+                     <p className="text-3xl font-bold text-slate-900">${totalSalesForecast.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+                  </div>
+                  <div className="bg-white p-6 rounded-3xl border shadow-sm overflow-visible">
+                     <h3 className="text-slate-500 text-sm font-medium mb-1">Waste (OVERPREP) <Tooltip what="Items discarded due to high par levels." source="Waste Sheets." why="Signals need for rule adjustments." align="right" /></h3>
+                     <p className="text-3xl font-bold text-rose-600">$142.50</p>
+                  </div>
                 </div>
 
-                <div className="bg-white p-6 rounded-3xl border shadow-sm overflow-visible">
-                  <h3 className="font-bold text-slate-900 mb-6 flex items-center gap-2">
-                    <Icons.Search /> Active Data Pipelines
-                    <Tooltip what="Live connections to your restaurant technology stack." source="API Webhooks." why="Ensures real-time accuracy of prep recommendations." align="right" />
-                  </h3>
-                  <div className="space-y-4">
-                    {[
-                      { name: 'Toast POS', status: 'Live', time: 'Real-time', color: 'bg-emerald-500' },
-                      { name: 'MarketMan IMS', status: 'Healthy', time: '12m ago', color: 'bg-emerald-500' },
-                      { name: '7shifts Labor', status: 'Syncing', time: 'Just now', color: 'bg-indigo-500' },
-                      { name: 'Weather API', status: 'Healthy', time: '1h ago', color: 'bg-emerald-500' }
-                    ].map(source => (
-                      <div key={source.name} className="flex items-center gap-4 p-4 border rounded-2xl bg-slate-50/50">
-                        <div className={`w-3 h-3 rounded-full ${source.color} animate-pulse shadow-[0_0_8px_rgba(0,0,0,0.1)]`}></div>
-                        <div>
-                          <p className="text-sm font-bold text-slate-900">{source.name}</p>
-                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{source.status} • {source.time}</p>
-                        </div>
-                      </div>
-                    ))}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  <div className="lg:col-span-2 bg-white p-6 rounded-3xl border shadow-sm overflow-visible">
+                    <div className="flex flex-col md:flex-row md:items-end justify-between mb-6 gap-4">
+                      <h3 className="font-bold text-slate-900">Historical Demand Visualization <Tooltip what="Actual vs Predicted Sales." source="POS data." why="AI and Rules verification." align="left" /></h3>
+                    </div>
+                    <ForecastChart data={MOCK_FORECAST} />
                   </div>
-                  <div className="mt-8 pt-6 border-t">
-                     <p className="text-[10px] font-black text-slate-400 uppercase mb-2">System Health</p>
-                     <div className="flex items-center gap-2">
-                        <div className="h-1.5 flex-1 bg-slate-100 rounded-full overflow-hidden">
-                           <div className="h-full bg-indigo-500 w-[98%]"></div>
-                        </div>
-                        <span className="text-[10px] font-bold text-indigo-600">98%</span>
-                     </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-          
-          {activeTab === 'inputs' && (
-            <div className="max-w-5xl mx-auto space-y-8 animate-in fade-in duration-500">
-              <div className="flex justify-between items-center">
-                <h2 className="text-2xl font-black text-slate-900">Required Daily Inputs</h2>
-                <div className="text-right">
-                  <p className="text-[10px] font-black text-slate-400 uppercase">Today's Total Forecast</p>
-                  <p className="text-2xl font-black text-indigo-600">${totalSalesForecast.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
-                </div>
-              </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {Object.entries(dayparts).map(([name, config]) => (
-                  <div key={name} className="bg-white rounded-3xl border shadow-sm p-6 space-y-6">
-                    <h3 className="font-black text-slate-900 uppercase tracking-widest text-sm flex items-center justify-between">
-                      {name} Service
-                      <span className="text-[10px] text-slate-400">Daypart {Object.keys(dayparts).indexOf(name) + 1}</span>
+                  <div className="bg-white p-6 rounded-3xl border shadow-sm overflow-visible">
+                    <h3 className="font-bold text-slate-900 mb-6 flex items-center gap-2">
+                      <Icons.Search /> Active Data Pipelines
+                      <Tooltip what="Live connections to your restaurant technology stack." source="API Webhooks." why="Ensures real-time accuracy of prep recommendations." align="right" />
                     </h3>
-                    
                     <div className="space-y-4">
-                      <div>
-                        <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Projected Meals</label>
-                        <input 
-                          type="number" 
-                          value={config.volume} 
-                          onChange={(e) => handleDaypartChange(name, 'volume', e.target.value)}
-                          className="w-full bg-slate-50 border-slate-200 border-2 rounded-2xl px-4 py-3 text-2xl font-black text-slate-900 focus:ring-2 focus:ring-indigo-500 outline-none transition-all" 
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Avg Guest Check ($)</label>
-                        <input 
-                          type="number" 
-                          step="0.01"
-                          value={config.avgCheck} 
-                          onChange={(e) => handleDaypartChange(name, 'avgCheck', e.target.value)}
-                          className="w-full bg-slate-50 border-slate-200 border-2 rounded-2xl px-4 py-3 text-2xl font-black text-slate-900 focus:ring-2 focus:ring-indigo-500 outline-none transition-all" 
-                        />
-                      </div>
+                      {[
+                        { name: 'Toast POS', status: 'Live', time: 'Real-time', color: 'bg-emerald-500' },
+                        { name: 'MarketMan IMS', status: 'Healthy', time: '12m ago', color: 'bg-emerald-500' },
+                        { name: '7shifts Labor', status: 'Syncing', time: 'Just now', color: 'bg-indigo-500' },
+                        { name: 'Weather API', status: 'Healthy', time: '1h ago', color: 'bg-emerald-500' }
+                      ].map(source => (
+                        <div key={source.name} className="flex items-center gap-4 p-4 border rounded-2xl bg-slate-50/50">
+                          <div className={`w-3 h-3 rounded-full ${source.color} animate-pulse shadow-[0_0_8px_rgba(0,0,0,0.1)]`}></div>
+                          <div>
+                            <p className="text-sm font-bold text-slate-900">{source.name}</p>
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{source.status} • {source.time}</p>
+                          </div>
+                        </div>
+                      ))}
                     </div>
-
-                    <div className="pt-4 border-t border-slate-50">
-                      <p className="text-[10px] font-black text-slate-400 uppercase">Projected Sales</p>
-                      <p className="text-lg font-black text-slate-800">${(config.volume * config.avgCheck).toLocaleString()}</p>
+                    <div className="mt-8 pt-6 border-t">
+                       <p className="text-[10px] font-black text-slate-400 uppercase mb-2">System Health</p>
+                       <div className="flex items-center gap-2">
+                          <div className="h-1.5 flex-1 bg-slate-100 rounded-full overflow-hidden">
+                             <div className="h-full bg-indigo-500 w-[98%]"></div>
+                          </div>
+                          <span className="text-[10px] font-bold text-indigo-600">98%</span>
+                       </div>
                     </div>
                   </div>
-                ))}
+                </div>
               </div>
+            )}
+            
+            {activeTab === 'inputs' && (
+              <div className="max-w-5xl mx-auto space-y-8 animate-in fade-in duration-500 pb-10">
+                <div className="flex justify-between items-center">
+                  <h2 className="text-2xl font-black text-slate-900">Required Daily Inputs</h2>
+                  <div className="text-right">
+                    <p className="text-[10px] font-black text-slate-400 uppercase">Today's Total Forecast</p>
+                    <p className="text-2xl font-black text-indigo-600">${totalSalesForecast.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+                  </div>
+                </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div className="bg-white rounded-3xl border shadow-sm p-6 overflow-visible">
-                  <h3 className="font-black text-slate-900 uppercase tracking-widest text-sm mb-4 flex items-center gap-2">
-                    <Icons.Search /> Special Event Flags
-                    <Tooltip what="Manual overrides for local events." source="Manager Input." why="Factors in outlier spikes." align="left" />
-                  </h3>
-                  <div className="space-y-3">
-                    {specialEvents.map(event => (
-                      <div key={event.id} className="flex items-center justify-between p-4 bg-indigo-50 rounded-2xl border border-indigo-100">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  {Object.entries(dayparts).map(([name, config]) => (
+                    <div key={name} className="bg-white rounded-3xl border shadow-sm p-6 space-y-6">
+                      <h3 className="font-black text-slate-900 uppercase tracking-widest text-sm flex items-center justify-between">
+                        {name} Service
+                        <span className="text-[10px] text-slate-400">Daypart {Object.keys(dayparts).indexOf(name) + 1}</span>
+                      </h3>
+                      
+                      <div className="space-y-4">
                         <div>
-                          <p className="font-bold text-indigo-900">{event.name}</p>
-                          <p className="text-xs text-indigo-700">Focus: {event.menuFocus} | Impact: +{Math.round((event.coverIncrease - 1) * 100)}% covers</p>
+                          <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Projected Meals</label>
+                          <input 
+                            type="number" 
+                            value={config.volume} 
+                            onChange={(e) => handleDaypartChange(name, 'volume', e.target.value)}
+                            className="w-full bg-slate-50 border-slate-200 border-2 rounded-2xl px-4 py-3 text-2xl font-black text-slate-900 focus:ring-2 focus:ring-indigo-500 outline-none transition-all" 
+                          />
                         </div>
-                        <button className="text-indigo-400 hover:text-rose-500 transition-colors"><Icons.Trash /></button>
+                        <div>
+                          <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Avg Guest Check ($)</label>
+                          <input 
+                            type="number" 
+                            step="0.01"
+                            value={config.avgCheck} 
+                            onChange={(e) => handleDaypartChange(name, 'avgCheck', e.target.value)}
+                            className="w-full bg-slate-50 border-slate-200 border-2 rounded-2xl px-4 py-3 text-2xl font-black text-slate-900 focus:ring-2 focus:ring-indigo-500 outline-none transition-all" 
+                          />
+                        </div>
                       </div>
-                    ))}
-                    <button className="w-full py-3 border-2 border-dashed border-slate-200 rounded-2xl text-slate-400 font-bold text-sm hover:border-indigo-400 hover:text-indigo-500 transition-all">+ Add Special Event</button>
-                  </div>
-                </div>
 
-                <div className="bg-slate-900 rounded-3xl p-6 text-white shadow-xl relative overflow-hidden">
-                  <div className="relative z-10">
-                    <h3 className="font-black uppercase tracking-widest text-sm mb-6 text-slate-400">Forecast Summary</h3>
-                    <div className="grid grid-cols-2 gap-8">
-                      <div>
-                        <p className="text-[10px] font-black text-slate-500 uppercase">Base Covers</p>
-                        <p className="text-3xl font-black">{dayparts.breakfast.volume + dayparts.lunch.volume + dayparts.dinner.volume}</p>
-                      </div>
-                      <div>
-                        <p className="text-[10px] font-black text-slate-500 uppercase">Event Impact</p>
-                        <p className="text-3xl font-black text-indigo-400">x{eventMultiplier.toFixed(2)}</p>
-                      </div>
-                      <div className="col-span-2 pt-4 border-t border-slate-800">
-                        <p className="text-[10px] font-black text-slate-500 uppercase mb-1">Final Prep Target (Covers)</p>
-                        <p className="text-5xl font-black">{totalTargetVolume}</p>
+                      <div className="pt-4 border-t border-slate-50">
+                        <p className="text-[10px] font-black text-slate-400 uppercase">Projected Sales</p>
+                        <p className="text-lg font-black text-slate-800">${(config.volume * config.avgCheck).toLocaleString()}</p>
                       </div>
                     </div>
-                  </div>
-                  <div className="absolute -bottom-10 -right-10 w-48 h-48 bg-indigo-600 rounded-full blur-3xl opacity-20"></div>
+                  ))}
                 </div>
-              </div>
-            </div>
-          )}
 
-          {activeTab === 'preplist' && (
-            <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500">
-              <div className="flex justify-between items-end">
-                 <div><h2 className="text-2xl font-black text-slate-900">Digital Prep List</h2><p className="text-sm text-slate-500 italic">Source: Deterministic rules-engine based on {totalTargetVolume} projected covers</p></div>
-                 <div className="bg-white border p-3 rounded-2xl shadow-sm text-right">
-                    <span className="text-[10px] font-black text-slate-400 uppercase">Approval Required</span>
-                    <button className="block text-sm font-bold text-indigo-600 hover:text-indigo-800">Generate Final PDF</button>
-                 </div>
-              </div>
-              
-              {(Object.entries(stations) as [string, PrepItem[]][]).map(([station, items]) => (
-                <div key={station} className="bg-white rounded-3xl border shadow-sm overflow-visible mb-8">
-                  <div className="p-6 border-b bg-slate-50 rounded-t-3xl flex justify-between items-center">
-                    <h3 className="font-black text-indigo-900 uppercase tracking-widest text-sm flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full bg-indigo-600 animate-pulse"></div>
-                      Station: {station}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <div className="bg-white rounded-3xl border shadow-sm p-6 overflow-visible">
+                    <h3 className="font-black text-slate-900 uppercase tracking-widest text-sm mb-4 flex items-center gap-2">
+                      <Icons.Search /> Special Event Flags
+                      <Tooltip what="Manual overrides for local events." source="Manager Input." why="Factors in outlier spikes." align="left" />
                     </h3>
-                    <span className="text-xs font-bold text-slate-500">{items.length} Tasks Assigned</span>
-                  </div>
-                  <div className="divide-y overflow-visible">
-                    {items.map(item => (
-                      <div key={item.id} className="p-6 hover:bg-slate-50 transition-colors flex flex-col md:flex-row gap-6 relative overflow-visible">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-3 mb-1">
-                            <h4 className="text-lg font-bold text-slate-900">{item.name}</h4>
-                            <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${item.priority === 'High' ? 'bg-rose-50 text-rose-600' : 'bg-slate-100 text-slate-500'}`}>{item.priority}</span>
+                    <div className="space-y-3">
+                      {specialEvents.map(event => (
+                        <div key={event.id} className="flex items-center justify-between p-4 bg-indigo-50 rounded-2xl border border-indigo-100">
+                          <div>
+                            <p className="font-bold text-indigo-900">{event.name}</p>
+                            <p className="text-xs text-indigo-700">Focus: {event.menuFocus} | Impact: +{Math.round((event.coverIncrease - 1) * 100)}% covers</p>
                           </div>
-                          <p className="text-xs text-slate-500 font-medium leading-relaxed">{item.whyExplanation}</p>
+                          <button className="text-indigo-400 hover:text-rose-500 transition-colors"><Icons.Trash /></button>
                         </div>
-                        <div className="flex flex-wrap items-center gap-4">
-                          <div className="bg-indigo-50 px-4 py-2 rounded-2xl text-center min-w-[100px]">
-                            <span className="text-[9px] font-black text-indigo-400 uppercase block">Need</span>
-                            <span className="text-lg font-black text-indigo-700">{item.prepNeeded} {item.unit}</span>
-                          </div>
-                          <div className="bg-slate-50 px-4 py-2 rounded-2xl text-center min-w-[100px]">
-                            <span className="text-[9px] font-black text-slate-400 uppercase block">Due By</span>
-                            <span className="text-lg font-black text-slate-700">{item.dueBy}</span>
-                          </div>
-                          <button onClick={() => toggleItemStatus(item.id)} className={`px-5 py-2 rounded-xl border-2 font-black transition-all text-sm uppercase tracking-widest ${item.status === 'Completed' ? 'bg-emerald-500 border-emerald-500 text-white shadow-lg shadow-emerald-100' : 'bg-white border-slate-200 text-slate-400 hover:border-indigo-600 hover:text-indigo-600'}`}>
-                            {item.status === 'Completed' ? 'Finished' : 'Mark Done'}
-                          </button>
+                      ))}
+                      <button className="w-full py-3 border-2 border-dashed border-slate-200 rounded-2xl text-slate-400 font-bold text-sm hover:border-indigo-400 hover:text-indigo-500 transition-all">+ Add Special Event</button>
+                    </div>
+                  </div>
+
+                  <div className="bg-slate-900 rounded-3xl p-6 text-white shadow-xl relative overflow-hidden">
+                    <div className="relative z-10">
+                      <h3 className="font-black uppercase tracking-widest text-sm mb-6 text-slate-400">Forecast Summary</h3>
+                      <div className="grid grid-cols-2 gap-8">
+                        <div>
+                          <p className="text-[10px] font-black text-slate-500 uppercase">Base Covers</p>
+                          <p className="text-3xl font-black">{dayparts.breakfast.volume + dayparts.lunch.volume + dayparts.dinner.volume}</p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] font-black text-slate-500 uppercase">Event Impact</p>
+                          <p className="text-3xl font-black text-indigo-400">x{eventMultiplier.toFixed(2)}</p>
+                        </div>
+                        <div className="col-span-2 pt-4 border-t border-slate-800">
+                          <p className="text-[10px] font-black text-slate-500 uppercase mb-1">Final Prep Target (Covers)</p>
+                          <p className="text-5xl font-black">{totalTargetVolume}</p>
                         </div>
                       </div>
-                    ))}
+                    </div>
+                    <div className="absolute -bottom-10 -right-10 w-48 h-48 bg-indigo-600 rounded-full blur-3xl opacity-20"></div>
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
+              </div>
+            )}
 
-          {activeTab === 'pmix' && (
-            <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500">
-              <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-                <div className="lg:col-span-1 space-y-6">
-                  <div className="bg-white rounded-3xl border shadow-sm p-6 overflow-visible">
-                    <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2"><Icons.Trend /> Product Mix <Tooltip what="7-day moving averages of POS transaction data." source="Direct POS API." why="Determines baseline prep requirements." align="left" /></h3>
-                    <div className="space-y-6">
-                      {menuItems.map(item => (
-                        <div key={item.id} className="space-y-2 border-b border-slate-50 pb-4 last:border-0">
-                          <div className="flex justify-between text-xs font-bold"><span className="text-slate-600">{item.name}</span><span className="text-indigo-600">{(item.productMix * 100).toFixed(0)}%</span></div>
-                          <div className="w-full bg-slate-100 rounded-full h-1.5"><div className="bg-indigo-500 h-full rounded-full" style={{ width: `${item.productMix * 100}%` }}></div></div>
-                          <div className="flex items-center justify-between"><span className="text-[9px] font-black text-slate-400 uppercase">7d Trend</span><div className="w-2/3"><MiniTrendChart data={item.history7Days} /></div></div>
+            {activeTab === 'preplist' && (
+              <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500 pb-10">
+                <div className="flex justify-between items-end">
+                   <div><h2 className="text-2xl font-black text-slate-900">Digital Prep List</h2><p className="text-sm text-slate-500 italic">Source: Deterministic rules-engine based on {totalTargetVolume} projected covers</p></div>
+                   <div className="bg-white border p-3 rounded-2xl shadow-sm text-right">
+                      <span className="text-[10px] font-black text-slate-400 uppercase">Approval Required</span>
+                      <button className="block text-sm font-bold text-indigo-600 hover:text-indigo-800">Generate Final PDF</button>
+                   </div>
+                </div>
+                
+                {(Object.entries(stations) as [string, PrepItem[]][]).map(([station, items]) => (
+                  <div key={station} className="bg-white rounded-3xl border shadow-sm overflow-visible mb-8">
+                    <div className="p-6 border-b bg-slate-50 rounded-t-3xl flex justify-between items-center">
+                      <h3 className="font-black text-indigo-900 uppercase tracking-widest text-sm flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-indigo-600 animate-pulse"></div>
+                        Station: {station}
+                      </h3>
+                      <span className="text-xs font-bold text-slate-500">{items.length} Tasks Assigned</span>
+                    </div>
+                    <div className="divide-y overflow-visible">
+                      {items.map(item => (
+                        <div key={item.id} className="p-6 hover:bg-slate-50 transition-colors flex flex-col md:flex-row gap-6 relative overflow-visible">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-3 mb-1">
+                              <h4 className="text-lg font-bold text-slate-900">{item.name}</h4>
+                              <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${item.priority === 'High' ? 'bg-rose-50 text-rose-600' : 'bg-slate-100 text-slate-500'}`}>{item.priority}</span>
+                            </div>
+                            <p className="text-xs text-slate-500 font-medium leading-relaxed">{item.whyExplanation}</p>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-4">
+                            <div className="bg-indigo-50 px-4 py-2 rounded-2xl text-center min-w-[100px]">
+                              <span className="text-[9px] font-black text-indigo-400 uppercase block">Need</span>
+                              <span className="text-lg font-black text-indigo-700">{item.prepNeeded} {item.unit}</span>
+                            </div>
+                            <div className="bg-slate-50 px-4 py-2 rounded-2xl text-center min-w-[100px]">
+                              <span className="text-[9px] font-black text-slate-400 uppercase block">Due By</span>
+                              <span className="text-lg font-black text-slate-700">{item.dueBy}</span>
+                            </div>
+                            <button onClick={() => toggleItemStatus(item.id)} className={`px-5 py-2 rounded-xl border-2 font-black transition-all text-sm uppercase tracking-widest ${item.status === 'Completed' ? 'bg-emerald-500 border-emerald-500 text-white shadow-lg shadow-emerald-100' : 'bg-white border-slate-200 text-slate-400 hover:border-indigo-600 hover:text-indigo-600'}`}>
+                              {item.status === 'Completed' ? 'Finished' : 'Mark Done'}
+                            </button>
+                          </div>
                         </div>
                       ))}
                     </div>
                   </div>
-                  <div className="bg-slate-900 text-white rounded-3xl p-6 shadow-xl">
-                    <h3 className="text-xs font-bold text-slate-400 uppercase mb-1">Projected Sales</h3>
-                    <p className="text-3xl font-black">${totalSalesForecast.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
-                    <p className="text-[10px] text-slate-400 mt-2 font-bold uppercase tracking-widest">{totalTargetVolume} Projected Meals Today</p>
-                  </div>
-                </div>
-                <div className="lg:col-span-3">
-                  <div className="bg-white p-6 rounded-3xl border shadow-sm overflow-visible">
-                    <h3 className="font-bold text-slate-900 mb-6">Volume Explosion Analysis</h3>
-                    <div className="space-y-4">
-                       {menuItems.map(item => (
-                         <div key={item.id} className="p-4 border rounded-2xl flex justify-between items-center">
-                            <div>
-                               <p className="font-bold text-slate-800">{item.name}</p>
-                               <p className="text-xs text-slate-500">{(item.productMix * 100).toFixed(0)}% of {totalTargetVolume} covers</p>
-                            </div>
-                            <div className="text-right">
-                               <p className="text-lg font-black text-indigo-600">{Math.round(totalTargetVolume * item.productMix)} units</p>
-                            </div>
-                         </div>
-                       ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'agent' && (
-            <div className="max-w-4xl mx-auto space-y-6">
-              <div className="bg-white rounded-3xl border shadow-sm p-8 flex flex-col items-center relative overflow-hidden">
-                <div className={`w-24 h-24 rounded-full flex items-center justify-center mb-4 transition-all ${isLiveActive ? 'bg-indigo-50 animate-pulse scale-110' : 'bg-slate-50'}`}>
-                  <div className="w-12 h-12 bg-indigo-600 text-white rounded-full flex items-center justify-center shadow-lg"><Icons.Bot /></div>
-                </div>
-                <h2 className="text-lg font-bold">Prep Agent Interface</h2>
-                <p className="text-sm text-slate-500 mb-8">Guided conversation for meal planning & par adjustments.</p>
-                <div className="w-full space-y-4">
-                  {transcription.map((t, i) => (
-                    <div key={i} className="space-y-4">
-                      <div className="flex justify-end"><div className="bg-indigo-600 text-white px-4 py-2 rounded-2xl rounded-tr-none text-sm max-w-[80%]">{t.user}</div></div>
-                      <div className="flex justify-start">
-                        <div className="bg-slate-100 text-slate-800 px-4 py-2 rounded-2xl rounded-tl-none text-sm max-w-[80%] border border-slate-200">
-                          {t.agent.includes('[AI SUGGESTION]') ? (
-                            <span className="block"><span className="text-[10px] font-black text-indigo-600 uppercase mb-1 block">✨ AI Suggestion</span>{t.agent.replace('[AI SUGGESTION]', '')}</span>
-                          ) : t.agent}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                  {currentAgentText && <div className="text-xs text-slate-400 italic">Agent is typing...</div>}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'inventory' && (
-            <div className="bg-white border rounded-2xl shadow-sm overflow-visible animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-5xl mx-auto">
-               <div className="p-6 border-b flex justify-between items-center bg-slate-50 rounded-t-2xl">
-                <h3 className="font-bold text-slate-900">Inventory Status <Tooltip what="Current counts." source="IMS Sync." why="Baseline logic." align="left" /></h3>
-                <button className="text-sm bg-white border border-slate-200 px-3 py-1.5 rounded-lg font-semibold hover:bg-slate-50 transition-colors shadow-sm">Manual Update</button>
-              </div>
-              <div className="divide-y overflow-visible">
-                {inventory.map(item => (
-                  <div key={item.id} className="p-6 flex justify-between items-center hover:bg-slate-50">
-                    <div>
-                      <p className="font-bold text-slate-900">{item.name}</p>
-                      <p className="text-xs text-slate-500">{item.category}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className={`font-bold ${item.currentStock < item.threshold ? 'text-rose-600' : 'text-slate-700'}`}>
-                        {item.currentStock} / {item.threshold} {item.unit}
-                      </p>
-                    </div>
-                  </div>
                 ))}
               </div>
-            </div>
-          )}
+            )}
 
-          {activeTab === 'help' && (
-            <div className="max-w-4xl mx-auto space-y-12 animate-in fade-in duration-500 pb-20">
-              <div className="text-center">
-                <h2 className="text-4xl font-black text-slate-900 mb-4">How to use PrepList Agent™</h2>
-                <p className="text-slate-500 max-w-2xl mx-auto">Master the deterministic kitchen intelligence system to reduce waste and boost efficiency.</p>
+            {activeTab === 'pmix' && (
+              <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500 pb-10">
+                <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                  <div className="lg:col-span-1 space-y-6">
+                    <div className="bg-white rounded-3xl border shadow-sm p-6 overflow-visible">
+                      <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2"><Icons.Trend /> Product Mix <Tooltip what="7-day moving averages of POS transaction data." source="Direct POS API." why="Determines baseline prep requirements." align="left" /></h3>
+                      <div className="space-y-6">
+                        {menuItems.map(item => (
+                          <div key={item.id} className="space-y-2 border-b border-slate-50 pb-4 last:border-0">
+                            <div className="flex justify-between text-xs font-bold"><span className="text-slate-600">{item.name}</span><span className="text-indigo-600">{(item.productMix * 100).toFixed(0)}%</span></div>
+                            <div className="w-full bg-slate-100 rounded-full h-1.5"><div className="bg-indigo-500 h-full rounded-full" style={{ width: `${item.productMix * 100}%` }}></div></div>
+                            <div className="flex items-center justify-between"><span className="text-[9px] font-black text-slate-400 uppercase">7d Trend</span><div className="w-2/3"><MiniTrendChart data={item.history7Days} /></div></div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="bg-slate-900 text-white rounded-3xl p-6 shadow-xl">
+                      <h3 className="text-xs font-bold text-slate-400 uppercase mb-1">Projected Sales</h3>
+                      <p className="text-3xl font-black">${totalSalesForecast.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+                      <p className="text-[10px] text-slate-400 mt-2 font-bold uppercase tracking-widest">{totalTargetVolume} Projected Meals Today</p>
+                    </div>
+                  </div>
+                  <div className="lg:col-span-3">
+                    <div className="bg-white p-6 rounded-3xl border shadow-sm overflow-visible">
+                      <h3 className="font-bold text-slate-900 mb-6">Volume Explosion Analysis</h3>
+                      <div className="space-y-4">
+                         {menuItems.map(item => (
+                           <div key={item.id} className="p-4 border rounded-2xl flex justify-between items-center">
+                              <div>
+                                 <p className="font-bold text-slate-800">{item.name}</p>
+                                 <p className="text-xs text-slate-500">{(item.productMix * 100).toFixed(0)}% of {totalTargetVolume} covers</p>
+                              </div>
+                              <div className="text-right">
+                                 <p className="text-lg font-black text-indigo-600">{Math.round(totalTargetVolume * item.productMix)} units</p>
+                              </div>
+                           </div>
+                         ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
+            )}
 
-              <div className="space-y-8">
-                <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest border-b pb-4">Module Instructions</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {[
-                    { title: 'Dashboard', icon: <Icons.Dashboard />, text: 'View high-level restaurant health. Monitor low-stock alerts and historical sales trends at a glance.' },
-                    { title: 'Daily Inputs', icon: <Icons.Search />, text: 'CRITICAL: Enter projected meal volume and average checks for each daypart. Add special events to apply multipliers.' },
-                    { title: 'Prep List', icon: <Icons.ChefHat />, text: 'Your actionable tasks grouped by station. Mark items as in-progress or completed as you work.' },
-                    { title: 'P-Mix Analysis', icon: <Icons.Trend />, text: 'See which menu items are driving prep needs based on historical POS sales data and trends.' },
-                    { title: 'Inventory', icon: <Icons.Inventory />, text: 'Live sync with your IMS. Shows current stock vs thresholds to ensure you never run out.' },
-                    { title: 'Waste Tracking', icon: <Icons.Trash />, text: 'Log over-prepped items. The engine uses this data to automatically reduce future prep volumes.' }
-                  ].map((help, i) => (
-                    <div key={i} className="bg-white p-6 rounded-3xl border shadow-sm flex gap-4">
-                      <div className="bg-indigo-50 text-indigo-600 p-3 rounded-2xl h-fit">{help.icon}</div>
+            {activeTab === 'agent' && (
+              <div className="max-w-4xl mx-auto space-y-6 pb-10">
+                <div className="bg-white rounded-3xl border shadow-sm p-8 flex flex-col items-center relative overflow-hidden">
+                  <div className={`w-24 h-24 rounded-full flex items-center justify-center mb-4 transition-all ${isLiveActive ? 'bg-indigo-50 animate-pulse scale-110' : 'bg-slate-50'}`}>
+                    <div className="w-12 h-12 bg-indigo-600 text-white rounded-full flex items-center justify-center shadow-lg"><Icons.Bot /></div>
+                  </div>
+                  <h2 className="text-lg font-bold">Prep Agent Interface</h2>
+                  <p className="text-sm text-slate-500 mb-8">Guided conversation for meal planning & par adjustments.</p>
+                  <div className="w-full space-y-4">
+                    {transcription.map((t, i) => (
+                      <div key={i} className="space-y-4">
+                        <div className="flex justify-end"><div className="bg-indigo-600 text-white px-4 py-2 rounded-2xl rounded-tr-none text-sm max-w-[80%]">{t.user}</div></div>
+                        <div className="flex justify-start">
+                          <div className="bg-slate-100 text-slate-800 px-4 py-2 rounded-2xl rounded-tl-none text-sm max-w-[80%] border border-slate-200">
+                            {t.agent.includes('[AI SUGGESTION]') ? (
+                              <span className="block"><span className="text-[10px] font-black text-indigo-600 uppercase mb-1 block">✨ AI Suggestion</span>{t.agent.replace('[AI SUGGESTION]', '')}</span>
+                            ) : t.agent}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                    {currentAgentText && <div className="text-xs text-slate-400 italic">Agent is typing...</div>}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'inventory' && (
+              <div className="bg-white border rounded-2xl shadow-sm overflow-visible animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-5xl mx-auto pb-10">
+                 <div className="p-6 border-b flex justify-between items-center bg-slate-50 rounded-t-2xl">
+                  <h3 className="font-bold text-slate-900">Inventory Status <Tooltip what="Current counts." source="IMS Sync." why="Baseline logic." align="left" /></h3>
+                  <button className="text-sm bg-white border border-slate-200 px-3 py-1.5 rounded-lg font-semibold hover:bg-slate-50 transition-colors shadow-sm">Manual Update</button>
+                </div>
+                <div className="divide-y overflow-visible">
+                  {inventory.map(item => (
+                    <div key={item.id} className="p-6 flex justify-between items-center hover:bg-slate-50">
                       <div>
-                        <h4 className="font-bold text-slate-900 mb-1">{help.title}</h4>
-                        <p className="text-sm text-slate-500 leading-relaxed">{help.text}</p>
+                        <p className="font-bold text-slate-900">{item.name}</p>
+                        <p className="text-xs text-slate-500">{item.category}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className={`font-bold ${item.currentStock < item.threshold ? 'text-rose-600' : 'text-slate-700'}`}>
+                          {item.currentStock} / {item.threshold} {item.unit}
+                        </p>
                       </div>
                     </div>
                   ))}
                 </div>
               </div>
+            )}
 
-              <div className="space-y-6">
-                <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest border-b pb-4">Frequently Asked Questions</h3>
-                <div className="space-y-4">
-                  {[
-                    { q: 'How is the Prep Needed value calculated?', a: 'Our engine uses a deterministic formula: (Base Cover Target / Historical Avg) * Item Forecast * Weekend/Weekday Multiplier * Station Buffer. It then subtracts current stock.' },
-                    { q: 'What are Special Event Flags?', a: 'Manual overrides for local events (e.g., Farmers Markets). They apply a percentage multiplier to your base covers to account for expected spikes.' },
-                    { q: 'Does the Prep Agent learn from my kitchen?', a: 'Yes. By logging waste data, the AI identifies over-prepping patterns and suggests adjustments to your rules to save on food costs.' },
-                    { q: 'How do I mark an item as 86\'d?', a: 'Navigate to Inventory and update the manual count to zero. The Prep Agent will flag the item as critical on the Dashboard.' }
-                  ].map((faq, i) => (
-                    <div key={i} className="bg-slate-50 p-6 rounded-3xl border border-slate-100">
-                      <p className="font-bold text-slate-900 mb-2">Q: {faq.q}</p>
-                      <p className="text-sm text-slate-600 leading-relaxed">A: {faq.a}</p>
-                    </div>
-                  ))}
+            {activeTab === 'help' && (
+              <div className="max-w-4xl mx-auto space-y-12 animate-in fade-in duration-500 pb-20">
+                <div className="text-center">
+                  <h2 className="text-4xl font-black text-slate-900 mb-4">How to use PrepList Agent™</h2>
+                  <p className="text-slate-500 max-w-2xl mx-auto">Master the deterministic kitchen intelligence system to reduce waste and boost efficiency.</p>
+                </div>
+
+                <div className="space-y-8">
+                  <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest border-b pb-4">Module Instructions</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {[
+                      { title: 'Dashboard', icon: <Icons.Dashboard />, text: 'View high-level restaurant health. Monitor low-stock alerts and historical sales trends at a glance.' },
+                      { title: 'Daily Inputs', icon: <Icons.Search />, text: 'CRITICAL: Enter projected meal volume and average checks for each daypart. Add special events to apply multipliers.' },
+                      { title: 'Prep List', icon: <Icons.ChefHat />, text: 'Your actionable tasks grouped by station. Mark items as in-progress or completed as you work.' },
+                      { title: 'P-Mix Analysis', icon: <Icons.Trend />, text: 'See which menu items are driving prep needs based on historical POS sales data and trends.' },
+                      { title: 'Inventory', icon: <Icons.Inventory />, text: 'Live sync with your IMS. Shows current stock vs thresholds to ensure you never run out.' },
+                      { title: 'Waste Tracking', icon: <Icons.Trash />, text: 'Log over-prepped items. The engine uses this data to automatically reduce future prep volumes.' }
+                    ].map((help, i) => (
+                      <div key={i} className="bg-white p-6 rounded-3xl border shadow-sm flex gap-4">
+                        <div className="bg-indigo-50 text-indigo-600 p-3 rounded-2xl h-fit">{help.icon}</div>
+                        <div>
+                          <h4 className="font-bold text-slate-900 mb-1">{help.title}</h4>
+                          <p className="text-sm text-slate-500 leading-relaxed">{help.text}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-6">
+                  <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest border-b pb-4">Frequently Asked Questions</h3>
+                  <div className="space-y-4">
+                    {[
+                      { q: 'How is the Prep Needed value calculated?', a: 'Our engine uses a deterministic formula: (Base Cover Target / Historical Avg) * Item Forecast * Weekend/Weekday Multiplier * Station Buffer. It then subtracts current stock.' },
+                      { q: 'What are Special Event Flags?', a: 'Manual overrides for local events (e.g., Farmers Markets). They apply a percentage multiplier to your base covers to account for expected spikes.' },
+                      { q: 'Does the Prep Agent learn from my kitchen?', a: 'Yes. By logging waste data, the AI identifies over-prepping patterns and suggests adjustments to your rules to save on food costs.' },
+                      { q: 'How do I mark an item as 86\'d?', a: 'Navigate to Inventory and update the manual count to zero. The Prep Agent will flag the item as critical on the Dashboard.' }
+                    ].map((faq, i) => (
+                      <div key={i} className="bg-slate-50 p-6 rounded-3xl border border-slate-100">
+                        <p className="font-bold text-slate-900 mb-2">Q: {faq.q}</p>
+                        <p className="text-sm text-slate-600 leading-relaxed">A: {faq.a}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="bg-indigo-600 rounded-[2rem] p-10 text-white text-center shadow-2xl shadow-indigo-100 relative overflow-hidden">
+                  <div className="relative z-10">
+                    <h3 className="text-2xl font-black mb-4">Still need assistance?</h3>
+                    <p className="opacity-80 mb-8 max-w-lg mx-auto">Chef Anthony is available for 1-on-1 kitchen workflow optimization. Use the Prep Agent voice interface to ask specific tactical questions.</p>
+                    <button onClick={() => setActiveTab('agent')} className="bg-white text-indigo-600 px-8 py-3 rounded-full font-black hover:bg-indigo-50 transition-colors">Talk to Prep Agent</button>
+                  </div>
+                  <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500 rounded-full -mr-20 -mt-20 blur-3xl opacity-30"></div>
+                  <div className="absolute bottom-0 left-0 w-64 h-64 bg-indigo-400 rounded-full -ml-20 -mb-20 blur-3xl opacity-20"></div>
                 </div>
               </div>
+            )}
+          </div>
 
-              <div className="bg-indigo-600 rounded-[2rem] p-10 text-white text-center shadow-2xl shadow-indigo-100 relative overflow-hidden">
-                <div className="relative z-10">
-                  <h3 className="text-2xl font-black mb-4">Still need assistance?</h3>
-                  <p className="opacity-80 mb-8 max-w-lg mx-auto">Chef Anthony is available for 1-on-1 kitchen workflow optimization. Use the Prep Agent voice interface to ask specific tactical questions.</p>
-                  <button onClick={() => setActiveTab('agent')} className="bg-white text-indigo-600 px-8 py-3 rounded-full font-black hover:bg-indigo-50 transition-colors">Talk to Prep Agent</button>
-                </div>
-                <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500 rounded-full -mr-20 -mt-20 blur-3xl opacity-30"></div>
-                <div className="absolute bottom-0 left-0 w-64 h-64 bg-indigo-400 rounded-full -ml-20 -mb-20 blur-3xl opacity-20"></div>
+          <footer className="mt-auto pt-8 pb-12 md:pb-8 border-t border-slate-200">
+            <div className="flex flex-col md:flex-row items-center justify-between gap-4 text-[11px] font-bold text-slate-400 uppercase tracking-widest">
+              <div className="flex items-center gap-2">
+                <span>© 2026 FohBoh.ai, Inc.</span>
+                <span className="text-slate-300">|</span>
+                <span className="flex items-center gap-1">Powered by <span className="text-indigo-600">FohBoh.ai</span></span>
+              </div>
+              <div className="flex items-center gap-6">
+                <a href="#" className="hover:text-indigo-600 transition-colors">Contact Us</a>
+                <a href="#" className="hover:text-indigo-600 transition-colors">Privacy Policy</a>
+                <a href="#" className="hover:text-indigo-600 transition-colors">Terms of Service</a>
               </div>
             </div>
-          )}
+          </footer>
         </div>
         
         <div className="md:hidden bg-white border-t flex justify-around p-3 pb-6 shrink-0 z-50">
