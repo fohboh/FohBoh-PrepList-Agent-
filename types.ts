@@ -47,13 +47,33 @@ export interface InventoryItem {
   category: string;
 }
 
+export type WasteReasonCode = 
+  | 'SPOILAGE' 
+  | 'OVERPRODUCTION' 
+  | 'PREP_ERROR' 
+  | 'PORTIONING' 
+  | 'SERVICE' 
+  | 'STORAGE' 
+  | 'OTHER';
+
+export type WasteCategory = 'Pre-Consumer' | 'Post-Consumer';
+
 export interface WasteEntry {
   id: string;
   itemName: string;
+  itemType: 'Raw Ingredient' | 'Prepared Item' | 'Finished Dish';
   quantity: number;
   unit: string;
   reason: string;
+  reasonCode: WasteReasonCode;
+  category: WasteCategory;
+  station: string;
+  shift: 'AM' | 'PM' | 'Overnight';
+  staffInitials: string;
   timestamp: string;
+  costPerUnit: number;
+  totalCost: number;
+  disposalMethod: 'Landfill' | 'Compost' | 'Animal Feed' | 'Donation' | 'Biofuel' | 'Other';
 }
 
 export interface ForecastData {

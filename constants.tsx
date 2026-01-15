@@ -56,7 +56,40 @@ export const INITIAL_INVENTORY: InventoryItem[] = [
 ];
 
 export const INITIAL_WASTE: WasteEntry[] = [
-  { id: 'w_1', itemName: 'Diced Onions', quantity: 1.2, unit: 'kg', reason: 'OVERPREP', timestamp: '2023-10-22T22:00:00Z' },
+  { 
+    id: 'w_1', 
+    itemName: 'Diced Onions', 
+    itemType: 'Prepared Item',
+    quantity: 1.2, 
+    unit: 'kg', 
+    reason: 'Prepped for Friday but slow sales', 
+    reasonCode: 'OVERPRODUCTION',
+    category: 'Pre-Consumer',
+    station: 'Garde Manger',
+    shift: 'PM',
+    staffInitials: 'JKR',
+    timestamp: '2026-01-16T22:00:00Z',
+    costPerUnit: 1.20,
+    totalCost: 1.44,
+    disposalMethod: 'Compost'
+  },
+  { 
+    id: 'w_2', 
+    itemName: 'Marinated Chicken', 
+    itemType: 'Prepared Item',
+    quantity: 2.5, 
+    unit: 'kg', 
+    reason: 'Temperature abuse in reach-in', 
+    reasonCode: 'STORAGE',
+    category: 'Pre-Consumer',
+    station: 'Butchery',
+    shift: 'AM',
+    staffInitials: 'MA',
+    timestamp: '2026-01-15T09:30:00Z',
+    costPerUnit: 8.50,
+    totalCost: 21.25,
+    disposalMethod: 'Landfill'
+  }
 ];
 
 export const MOCK_FORECAST: ForecastData[] = [

@@ -11,7 +11,7 @@ import {
   MENU_ITEMS,
   Icons 
 } from './constants';
-import { PrepItem, InventoryItem, WasteEntry, MenuItem, SpecialEvent, DaypartConfig } from './types';
+import { PrepItem, InventoryItem, WasteEntry, MenuItem, SpecialEvent, DaypartConfig, WasteReasonCode, WasteCategory } from './types';
 import { GoogleGenAI, LiveServerMessage, Modality } from '@google/genai';
 
 // Audio Utility Functions
@@ -62,7 +62,7 @@ const App: React.FC = () => {
   const [wasteLogs, setWasteLogs] = useState<WasteEntry[]>(INITIAL_WASTE);
   const [menuItems, setMenuItems] = useState<MenuItem[]>(MENU_ITEMS);
   
-  // Daypart Configuration (Volume and Editable Avg Check)
+  // Daypart Configuration
   const [dayparts, setDayparts] = useState<Record<string, DaypartConfig>>({
     breakfast: { volume: 50, avgCheck: 12.50 },
     lunch: { volume: 120, avgCheck: 18.75 },
@@ -90,27 +90,21 @@ const App: React.FC = () => {
     return rawSales * eventMultiplier;
   }, [dayparts, eventMultiplier]);
   
-  const [isLiveActive, setIsLiveActive] = useState(false);
-  const [transcription, setTranscription] = useState<{user: string, agent: string}[]>([]);
-  const [currentAgentText, setCurrentAgentText] = useState('');
-  const [currentUserText, setCurrentUserText] = useState('');
-  
-  const inputAudioContextRef = useRef<AudioContext | null>(null);
-  const outputAudioContextRef = useRef<AudioContext | null>(null);
-  const sessionRef = useRef<any>(null);
-  const nextStartTimeRef = useRef(0);
-  const sourcesRef = useRef(new Set<AudioBufferSourceNode>());
-
-  // Rules-Based Deterministic Prep Engine
-  const calculatePrepNeed = (item: PrepItem, totalTarget: number) => {
+  // Rules-Based Deterministic Prep Engine with Learning Loop
+  const calculatePrepNeed = (item: PrepItem, totalTarget: number, wasteData: WasteEntry[]) => {
     const today = new Date().toLocaleDateString('en-US', { weekday: 'long' });
     const isWeekend = ['Thursday', 'Friday', 'Saturday', 'Sunday'].includes(today);
     
     // Baseline Need based on historical PMIX average
     let baseNeed = (totalTarget / 350) * item.forecastNeeded; 
     
+    // Check for "Learning Loop" - High Waste in recent logs
+    const recentWaste = wasteData.filter(w => w.itemName === item.name);
+    const totalWasted = recentWaste.reduce((sum, w) => sum + w.quantity, 0);
+    const wasteFactor = totalWasted > 0 ? 0.85 : 1.0; // Reduce by 15% if recurring waste exists
+
     const multiplier = isWeekend ? 1.5 : 0.5;
-    baseNeed = baseNeed * multiplier;
+    baseNeed = baseNeed * multiplier * wasteFactor;
 
     const buffer = item.category === 'Protein' ? 1.25 : 1.15;
     let bufferedNeed = baseNeed * buffer;
@@ -121,22 +115,27 @@ const App: React.FC = () => {
       toPrep = Math.min(toPrep, baseNeed * 1.5);
     }
     
+    let explanation = `${today} ${isWeekend ? 'Weekend' : 'Weekday'} multiplier (${multiplier}x) + ${item.category} buffer (${((buffer-1)*100).toFixed(0)}%)`;
+    if (wasteFactor < 1.0) {
+      explanation += ` | Adjusted -15% due to recent high waste logs.`;
+    }
+    
     return {
       amount: parseFloat(toPrep.toFixed(2)),
-      explanation: `${today} ${isWeekend ? 'Weekend' : 'Weekday'} multiplier (${multiplier}x) + ${item.category} buffer (${((buffer-1)*100).toFixed(0)}%)`
+      explanation
     };
   };
 
   const stations = useMemo(() => {
     const groups: Record<string, PrepItem[]> = {};
     prepItems.forEach(item => {
-      const calc = calculatePrepNeed(item, totalTargetVolume);
+      const calc = calculatePrepNeed(item, totalTargetVolume, wasteLogs);
       const updated = { ...item, prepNeeded: calc.amount, whyExplanation: calc.explanation };
       if (!groups[item.station]) groups[item.station] = [];
       groups[item.station].push(updated);
     });
     return groups;
-  }, [prepItems, totalTargetVolume]);
+  }, [prepItems, totalTargetVolume, wasteLogs]);
 
   const toggleItemStatus = (id: string) => {
     setPrepItems(prev => prev.map(item => item.id === id ? { ...item, status: item.status === 'Pending' ? 'In-Progress' : item.status === 'In-Progress' ? 'Completed' : 'Pending' } : item));
@@ -149,6 +148,54 @@ const App: React.FC = () => {
       [dp]: { ...prev[dp], [field]: num }
     }));
   };
+
+  // Waste Log State
+  const [showWasteForm, setShowWasteForm] = useState(false);
+  const [newWaste, setNewWaste] = useState<Partial<WasteEntry>>({
+    reasonCode: 'OVERPRODUCTION',
+    category: 'Pre-Consumer',
+    shift: 'PM',
+    disposalMethod: 'Compost'
+  });
+
+  const logWasteEntry = () => {
+    if (!newWaste.itemName || !newWaste.quantity) return;
+    const entry: WasteEntry = {
+      id: `w_${Date.now()}`,
+      itemName: newWaste.itemName as string,
+      itemType: newWaste.itemType || 'Prepared Item',
+      quantity: Number(newWaste.quantity),
+      unit: newWaste.unit || 'kg',
+      reason: newWaste.reason || 'Manual log',
+      reasonCode: newWaste.reasonCode || 'OTHER',
+      category: newWaste.category || 'Pre-Consumer',
+      station: newWaste.station || 'General Prep',
+      shift: newWaste.shift || 'PM',
+      staffInitials: newWaste.staffInitials || 'AN',
+      timestamp: new Date().toISOString(),
+      costPerUnit: newWaste.costPerUnit || 1.0,
+      totalCost: (newWaste.quantity || 0) * (newWaste.costPerUnit || 1.0),
+      disposalMethod: newWaste.disposalMethod || 'Landfill'
+    };
+    setWasteLogs(prev => [entry, ...prev]);
+    setShowWasteForm(false);
+    setNewWaste({ reasonCode: 'OVERPRODUCTION', category: 'Pre-Consumer', shift: 'PM', disposalMethod: 'Compost' });
+  };
+
+  const totalWasteCost = useMemo(() => {
+    return wasteLogs.reduce((sum, w) => sum + (w.totalCost || 0), 0);
+  }, [wasteLogs]);
+  
+  const [isLiveActive, setIsLiveActive] = useState(false);
+  const [transcription, setTranscription] = useState<{user: string, agent: string}[]>([]);
+  const [currentAgentText, setCurrentAgentText] = useState('');
+  const [currentUserText, setCurrentUserText] = useState('');
+  
+  const inputAudioContextRef = useRef<AudioContext | null>(null);
+  const outputAudioContextRef = useRef<AudioContext | null>(null);
+  const sessionRef = useRef<any>(null);
+  const nextStartTimeRef = useRef(0);
+  const sourcesRef = useRef(new Set<AudioBufferSourceNode>());
 
   const startLiveSession = async () => {
     if (isLiveActive) { sessionRef.current?.close(); setIsLiveActive(false); return; }
@@ -199,7 +246,7 @@ const App: React.FC = () => {
         outputAudioTranscription: {},
         inputAudioTranscription: {},
         systemInstruction: `You are the PrepList Agent™, an intelligent sous-chef advisor. 
-        Logic: Use Product Mix data and total forecast of ${totalTargetVolume} meals. Sales projection is $${totalSalesForecast.toFixed(2)}.
+        Current Waste Profile: Total waste cost is $${totalWasteCost.toFixed(2)}. Focus on items with reasonCode 'OVERPRODUCTION'.
         All your responses must clearly label AI suggestions vs. deterministic rules.`
       }
     });
@@ -351,7 +398,7 @@ const App: React.FC = () => {
                   </div>
                   <div className="bg-white p-6 rounded-3xl border shadow-sm overflow-visible">
                      <h3 className="text-slate-500 text-sm font-medium mb-1">Waste (OVERPREP) <Tooltip what="Items discarded due to high par levels." source="Waste Sheets." why="Signals need for rule adjustments." align="right" /></h3>
-                     <p className="text-3xl font-bold text-rose-600">$142.50</p>
+                     <p className="text-3xl font-bold text-rose-600">${totalWasteCost.toFixed(2)}</p>
                   </div>
                 </div>
 
@@ -384,15 +431,123 @@ const App: React.FC = () => {
                         </div>
                       ))}
                     </div>
-                    <div className="mt-8 pt-6 border-t">
-                       <p className="text-[10px] font-black text-slate-400 uppercase mb-2">System Health</p>
-                       <div className="flex items-center gap-2">
-                          <div className="h-1.5 flex-1 bg-slate-100 rounded-full overflow-hidden">
-                             <div className="h-full bg-indigo-500 w-[98%]"></div>
-                          </div>
-                          <span className="text-[10px] font-bold text-indigo-600">98%</span>
-                       </div>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {activeTab === 'waste' && (
+              <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500 pb-10">
+                <div className="flex justify-between items-end">
+                  <div>
+                    <h2 className="text-2xl font-black text-slate-900">Waste Tracking Dashboard</h2>
+                    <p className="text-sm text-slate-500">2026 Compliance Standard: FDA Traceability & Cost Control</p>
+                  </div>
+                  <button 
+                    onClick={() => setShowWasteForm(true)}
+                    className="bg-rose-500 text-white px-6 py-2.5 rounded-xl font-bold flex items-center gap-2 shadow-lg shadow-rose-100 hover:bg-rose-600 transition-all active:scale-95"
+                  >
+                    <Icons.Trash /> Log Waste Event
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                  <div className="bg-white p-6 rounded-3xl border shadow-sm">
+                    <h3 className="text-xs font-black text-slate-400 uppercase mb-1">Total Waste Cost</h3>
+                    <p className="text-3xl font-black text-rose-600">${totalWasteCost.toFixed(2)}</p>
+                    <p className="text-[10px] text-slate-400 font-bold uppercase mt-1">This Period</p>
+                  </div>
+                  <div className="bg-white p-6 rounded-3xl border shadow-sm">
+                    <h3 className="text-xs font-black text-slate-400 uppercase mb-1">Overproduction</h3>
+                    <p className="text-3xl font-black text-slate-800">
+                      ${wasteLogs.filter(w => w.reasonCode === 'OVERPRODUCTION').reduce((sum, w) => sum + w.totalCost, 0).toFixed(2)}
+                    </p>
+                    <p className="text-[10px] text-slate-400 font-bold uppercase mt-1">Optimization Goal: -15%</p>
+                  </div>
+                  <div className="bg-white p-6 rounded-3xl border shadow-sm">
+                    <h3 className="text-xs font-black text-slate-400 uppercase mb-1">Spoilage/Storage</h3>
+                    <p className="text-3xl font-black text-slate-800">
+                      ${wasteLogs.filter(w => ['SPOILAGE', 'STORAGE'].includes(w.reasonCode)).reduce((sum, w) => sum + w.totalCost, 0).toFixed(2)}
+                    </p>
+                    <p className="text-[10px] text-slate-400 font-bold uppercase mt-1">Facility Issue Alerts</p>
+                  </div>
+                  <div className="bg-indigo-600 p-6 rounded-3xl shadow-lg text-white">
+                    <h3 className="text-xs font-black text-indigo-200 uppercase mb-1">AI Recommendation</h3>
+                    <p className="text-sm font-bold">Reduce "Diced Onions" prep by 2.2kg for tomorrow based on pattern.</p>
+                  </div>
+                </div>
+
+                {showWasteForm && (
+                  <div className="bg-white border-2 border-rose-100 rounded-[2rem] p-8 shadow-2xl space-y-6 animate-in fade-in zoom-in duration-300">
+                    <div className="flex justify-between items-center border-b pb-4">
+                      <h3 className="text-xl font-black text-slate-900">New Waste Entry</h3>
+                      <button onClick={() => setShowWasteForm(false)} className="text-slate-400 hover:text-rose-500">Close</button>
                     </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black text-slate-400 uppercase">Item Name</label>
+                        <select 
+                          className="w-full bg-slate-50 border-2 border-slate-100 rounded-xl px-4 py-3 text-slate-900 font-bold focus:ring-2 focus:ring-rose-500 outline-none"
+                          onChange={(e) => setNewWaste({...newWaste, itemName: e.target.value})}
+                        >
+                          <option value="">Select Item...</option>
+                          {prepItems.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
+                        </select>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black text-slate-400 uppercase">Quantity & Unit</label>
+                        <div className="flex gap-2">
+                          <input type="number" step="0.1" placeholder="Qty" className="w-2/3 bg-slate-50 border-2 border-slate-100 rounded-xl px-4 py-3 text-slate-900 font-bold outline-none" onChange={(e) => setNewWaste({...newWaste, quantity: Number(e.target.value)})} />
+                          <input type="text" placeholder="Unit" className="w-1/3 bg-slate-50 border-2 border-slate-100 rounded-xl px-4 py-3 text-slate-900 font-bold outline-none" onChange={(e) => setNewWaste({...newWaste, unit: e.target.value})} />
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black text-slate-400 uppercase">Reason Code</label>
+                        <select 
+                          className="w-full bg-slate-50 border-2 border-slate-100 rounded-xl px-4 py-3 text-slate-900 font-bold outline-none"
+                          onChange={(e) => setNewWaste({...newWaste, reasonCode: e.target.value as WasteReasonCode})}
+                        >
+                          <option value="OVERPRODUCTION">OVERPRODUCTION</option>
+                          <option value="SPOILAGE">SPOILAGE</option>
+                          <option value="PREP_ERROR">PREP_ERROR</option>
+                          <option value="STORAGE">STORAGE</option>
+                          <option value="OTHER">OTHER</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div className="flex justify-end pt-4">
+                      <button 
+                        onClick={logWasteEntry}
+                        className="bg-rose-500 text-white px-10 py-3 rounded-2xl font-black shadow-lg shadow-rose-100 hover:bg-rose-600 transition-all"
+                      >
+                        Commit Log Entry
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                <div className="bg-white rounded-3xl border shadow-sm overflow-hidden">
+                  <div className="p-6 bg-slate-50 border-b flex justify-between items-center">
+                    <h3 className="font-black text-slate-900 uppercase tracking-widest text-sm">Recent Logs</h3>
+                    <span className="text-[10px] font-black text-slate-400 uppercase">Audit Trail - 2026 Compliant</span>
+                  </div>
+                  <div className="divide-y">
+                    {wasteLogs.map(log => (
+                      <div key={log.id} className="p-6 hover:bg-slate-50 transition-colors flex justify-between items-center">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-3">
+                            <h4 className="font-bold text-slate-900">{log.itemName}</h4>
+                            <span className="text-[10px] font-black bg-rose-50 text-rose-600 px-2 py-0.5 rounded-full uppercase">{log.reasonCode}</span>
+                          </div>
+                          <p className="text-xs text-slate-500 font-medium">Logged by {log.staffInitials} • {log.shift} Shift • Station: {log.station}</p>
+                          <p className="text-[10px] text-slate-400 italic">Reason: {log.reason}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-lg font-black text-slate-900">{log.quantity} {log.unit}</p>
+                          <p className="text-xs font-bold text-rose-500">-${log.totalCost.toFixed(2)}</p>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
               </div>
@@ -462,29 +617,7 @@ const App: React.FC = () => {
                           <button className="text-indigo-400 hover:text-rose-500 transition-colors"><Icons.Trash /></button>
                         </div>
                       ))}
-                      <button className="w-full py-3 border-2 border-dashed border-slate-200 rounded-2xl text-slate-400 font-bold text-sm hover:border-indigo-400 hover:text-indigo-500 transition-all">+ Add Special Event</button>
                     </div>
-                  </div>
-
-                  <div className="bg-slate-900 rounded-3xl p-6 text-white shadow-xl relative overflow-hidden">
-                    <div className="relative z-10">
-                      <h3 className="font-black uppercase tracking-widest text-sm mb-6 text-slate-400">Forecast Summary</h3>
-                      <div className="grid grid-cols-2 gap-8">
-                        <div>
-                          <p className="text-[10px] font-black text-slate-500 uppercase">Base Covers</p>
-                          <p className="text-3xl font-black">{dayparts.breakfast.volume + dayparts.lunch.volume + dayparts.dinner.volume}</p>
-                        </div>
-                        <div>
-                          <p className="text-[10px] font-black text-slate-500 uppercase">Event Impact</p>
-                          <p className="text-3xl font-black text-indigo-400">x{eventMultiplier.toFixed(2)}</p>
-                        </div>
-                        <div className="col-span-2 pt-4 border-t border-slate-800">
-                          <p className="text-[10px] font-black text-slate-500 uppercase mb-1">Final Prep Target (Covers)</p>
-                          <p className="text-5xl font-black">{totalTargetVolume}</p>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="absolute -bottom-10 -right-10 w-48 h-48 bg-indigo-600 rounded-full blur-3xl opacity-20"></div>
                   </div>
                 </div>
               </div>
@@ -493,11 +626,7 @@ const App: React.FC = () => {
             {activeTab === 'preplist' && (
               <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500 pb-10">
                 <div className="flex justify-between items-end">
-                   <div><h2 className="text-2xl font-black text-slate-900">Digital Prep List</h2><p className="text-sm text-slate-500 italic">Source: Deterministic rules-engine based on {totalTargetVolume} projected covers</p></div>
-                   <div className="bg-white border p-3 rounded-2xl shadow-sm text-right">
-                      <span className="text-[10px] font-black text-slate-400 uppercase">Approval Required</span>
-                      <button className="block text-sm font-bold text-indigo-600 hover:text-indigo-800">Generate Final PDF</button>
-                   </div>
+                   <div><h2 className="text-2xl font-black text-slate-900">Digital Prep List</h2><p className="text-sm text-slate-500 italic">Source: Deterministic rules-engine + Waste Optimization Factor</p></div>
                 </div>
                 
                 {(Object.entries(stations) as [string, PrepItem[]][]).map(([station, items]) => (
@@ -524,10 +653,6 @@ const App: React.FC = () => {
                               <span className="text-[9px] font-black text-indigo-400 uppercase block">Need</span>
                               <span className="text-lg font-black text-indigo-700">{item.prepNeeded} {item.unit}</span>
                             </div>
-                            <div className="bg-slate-50 px-4 py-2 rounded-2xl text-center min-w-[100px]">
-                              <span className="text-[9px] font-black text-slate-400 uppercase block">Due By</span>
-                              <span className="text-lg font-black text-slate-700">{item.dueBy}</span>
-                            </div>
                             <button onClick={() => toggleItemStatus(item.id)} className={`px-5 py-2 rounded-xl border-2 font-black transition-all text-sm uppercase tracking-widest ${item.status === 'Completed' ? 'bg-emerald-500 border-emerald-500 text-white shadow-lg shadow-emerald-100' : 'bg-white border-slate-200 text-slate-400 hover:border-indigo-600 hover:text-indigo-600'}`}>
                               {item.status === 'Completed' ? 'Finished' : 'Mark Done'}
                             </button>
@@ -542,41 +667,151 @@ const App: React.FC = () => {
 
             {activeTab === 'pmix' && (
               <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500 pb-10">
-                <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-                  <div className="lg:col-span-1 space-y-6">
+                <div className="flex flex-col md:flex-row gap-8">
+                  {/* Left Column: Product Mix Sidebar */}
+                  <div className="md:w-80 space-y-6 shrink-0">
                     <div className="bg-white rounded-3xl border shadow-sm p-6 overflow-visible">
-                      <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2"><Icons.Trend /> Product Mix <Tooltip what="7-day moving averages of POS transaction data." source="Direct POS API." why="Determines baseline prep requirements." align="left" /></h3>
+                      <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2">
+                        <Icons.Trend /> Product Mix %
+                        <Tooltip what="7-day moving averages." source="Direct POS API." why="Determines baseline prep." align="left" />
+                      </h3>
                       <div className="space-y-6">
                         {menuItems.map(item => (
                           <div key={item.id} className="space-y-2 border-b border-slate-50 pb-4 last:border-0">
-                            <div className="flex justify-between text-xs font-bold"><span className="text-slate-600">{item.name}</span><span className="text-indigo-600">{(item.productMix * 100).toFixed(0)}%</span></div>
-                            <div className="w-full bg-slate-100 rounded-full h-1.5"><div className="bg-indigo-500 h-full rounded-full" style={{ width: `${item.productMix * 100}%` }}></div></div>
-                            <div className="flex items-center justify-between"><span className="text-[9px] font-black text-slate-400 uppercase">7d Trend</span><div className="w-2/3"><MiniTrendChart data={item.history7Days} /></div></div>
+                            <div className="flex justify-between text-xs font-bold">
+                              <span className="text-slate-600">{item.name}</span>
+                              <span className="text-indigo-600">{(item.productMix * 100).toFixed(0)}%</span>
+                            </div>
+                            <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                              <div 
+                                className="bg-indigo-500 h-full rounded-full transition-all duration-1000" 
+                                style={{ width: `${item.productMix * 100}%` }}
+                              ></div>
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">7d Velocity</span>
+                              <div className="w-2/3"><MiniTrendChart data={item.history7Days} /></div>
+                            </div>
                           </div>
                         ))}
                       </div>
                     </div>
-                    <div className="bg-slate-900 text-white rounded-3xl p-6 shadow-xl">
-                      <h3 className="text-xs font-bold text-slate-400 uppercase mb-1">Projected Sales</h3>
+
+                    <div className="bg-slate-900 rounded-3xl p-6 text-white shadow-xl relative overflow-hidden">
+                      <h3 className="text-xs font-black text-slate-400 uppercase mb-1">Target Sales Volume</h3>
                       <p className="text-3xl font-black">${totalSalesForecast.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
-                      <p className="text-[10px] text-slate-400 mt-2 font-bold uppercase tracking-widest">{totalTargetVolume} Projected Meals Today</p>
+                      <p className="text-[10px] text-slate-400 mt-2 font-black uppercase tracking-widest">Base Target: {totalTargetVolume} meals</p>
                     </div>
                   </div>
-                  <div className="lg:col-span-3">
-                    <div className="bg-white p-6 rounded-3xl border shadow-sm overflow-visible">
-                      <h3 className="font-bold text-slate-900 mb-6">Volume Explosion Analysis</h3>
-                      <div className="space-y-4">
-                         {menuItems.map(item => (
-                           <div key={item.id} className="p-4 border rounded-2xl flex justify-between items-center">
-                              <div>
-                                 <p className="font-bold text-slate-800">{item.name}</p>
-                                 <p className="text-xs text-slate-500">{(item.productMix * 100).toFixed(0)}% of {totalTargetVolume} covers</p>
+
+                  {/* Main Area: Detailed Analysis */}
+                  <div className="flex-1 space-y-8">
+                    {/* Volume Explosion Grid */}
+                    <div className="bg-white p-8 rounded-[2.5rem] border shadow-sm space-y-6">
+                      <div className="flex justify-between items-center">
+                        <h3 className="text-xl font-black text-slate-900 flex items-center gap-3">
+                          <span className="p-2 bg-indigo-50 text-indigo-600 rounded-xl"><Icons.Trend /></span>
+                          Menu Volume Explosion
+                        </h3>
+                        <div className="px-4 py-1.5 bg-slate-50 rounded-full text-[10px] font-black text-slate-400 uppercase tracking-tighter border">
+                          Deterministic Multiplier: {eventMultiplier.toFixed(2)}x
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {menuItems.map(item => {
+                          const projectedUnits = Math.round(totalTargetVolume * item.productMix);
+                          const trend = item.history7Days[6] > item.history7Days[0] ? 'up' : 'down';
+                          return (
+                            <div key={item.id} className="p-6 border-2 border-slate-50 rounded-3xl hover:border-indigo-100 transition-all group relative overflow-hidden">
+                              <div className="relative z-10 space-y-4">
+                                <div className="flex justify-between items-start">
+                                  <h4 className="font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">{item.name}</h4>
+                                  <span className={`p-1.5 rounded-lg ${trend === 'up' ? 'text-emerald-500 bg-emerald-50' : 'text-rose-500 bg-rose-50'}`}>
+                                    {trend === 'up' ? '↗' : '↘'}
+                                  </span>
+                                </div>
+                                <div className="flex items-end justify-between">
+                                  <div>
+                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Projected Sale</p>
+                                    <p className="text-3xl font-black text-slate-900">{projectedUnits}</p>
+                                  </div>
+                                  <div className="text-right">
+                                    <p className="text-xs font-bold text-indigo-600">{Math.round(item.productMix * 100)}% Share</p>
+                                  </div>
+                                </div>
                               </div>
-                              <div className="text-right">
-                                 <p className="text-lg font-black text-indigo-600">{Math.round(totalTargetVolume * item.productMix)} units</p>
-                              </div>
-                           </div>
-                         ))}
+                              <div className="absolute -right-4 -bottom-4 w-24 h-24 bg-indigo-50 rounded-full opacity-0 group-hover:opacity-100 transition-all scale-0 group-hover:scale-100"></div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Ingredient Drag Analysis */}
+                    <div className="bg-white p-8 rounded-[2.5rem] border shadow-sm space-y-6">
+                      <h3 className="text-xl font-black text-slate-900 flex items-center gap-3">
+                         <span className="p-2 bg-emerald-50 text-emerald-600 rounded-xl"><Icons.ChefHat /></span>
+                         Prep Requirement Breakdown
+                      </h3>
+                      <div className="overflow-x-auto">
+                        <table className="w-full">
+                          <thead>
+                            <tr className="border-b text-left">
+                              <th className="pb-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Prep Item</th>
+                              <th className="pb-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Driven By</th>
+                              <th className="pb-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Unit Total</th>
+                              <th className="pb-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Inventory Impact</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-50">
+                            {prepItems.map(prep => {
+                              // Find which menu items use this prep item
+                              const usingMenuItems = menuItems.filter(mi => 
+                                mi.ingredients.some(ing => ing.prepItemId === prep.id)
+                              );
+                              
+                              if (usingMenuItems.length === 0) return null;
+
+                              const totalUnits = usingMenuItems.reduce((sum, mi) => {
+                                const unitsOfMenu = totalTargetVolume * mi.productMix;
+                                const amtPerUnit = mi.ingredients.find(ing => ing.prepItemId === prep.id)?.amountPerUnit || 0;
+                                return sum + (unitsOfMenu * amtPerUnit);
+                              }, 0);
+
+                              return (
+                                <tr key={prep.id} className="group hover:bg-slate-50 transition-colors">
+                                  <td className="py-4">
+                                    <p className="font-bold text-slate-900">{prep.name}</p>
+                                    <p className="text-[10px] text-slate-400 uppercase font-bold">{prep.category}</p>
+                                  </td>
+                                  <td className="py-4">
+                                    <div className="flex flex-wrap gap-1">
+                                      {usingMenuItems.map(mi => (
+                                        <span key={mi.id} className="px-2 py-0.5 bg-indigo-50 text-indigo-600 rounded text-[9px] font-black uppercase">
+                                          {mi.name}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  </td>
+                                  <td className="py-4 text-right">
+                                    <span className="text-lg font-black text-slate-800">{totalUnits.toFixed(1)} {prep.unit}</span>
+                                  </td>
+                                  <td className="py-4 text-right">
+                                    <div className="inline-flex items-center gap-2">
+                                      <div className="w-20 bg-slate-100 h-1.5 rounded-full overflow-hidden">
+                                        <div 
+                                          className={`h-full rounded-full ${prep.currentStock < (totalUnits * 0.5) ? 'bg-rose-500' : 'bg-emerald-500'}`} 
+                                          style={{ width: `${Math.min(100, (prep.currentStock / prep.forecastNeeded) * 100)}%` }}
+                                        ></div>
+                                      </div>
+                                      <span className="text-[10px] font-black text-slate-400">{( (prep.currentStock / prep.forecastNeeded) * 100).toFixed(0)}%</span>
+                                    </div>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
                       </div>
                     </div>
                   </div>

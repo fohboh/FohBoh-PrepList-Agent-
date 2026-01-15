@@ -20,13 +20,15 @@ export class PrepAgentService {
       Current Prep List: ${JSON.stringify(currentItems)}
       Sales Forecast: ${JSON.stringify(forecast)}
       Menu Velocity: ${JSON.stringify(velocity)}
-      Recent Waste History: ${JSON.stringify(wasteLogs)}
+      Detailed Waste Logs (2026 Framework): ${JSON.stringify(wasteLogs)}
       
       User is asking: "${query}"
       
       You are the PrepList Agent™. Your goal is to optimize kitchen efficiency and reduce food waste.
       Analyze the data and provide a helpful, concise response. 
-      Pay special attention to the Waste History; if certain items are consistently wasted, suggest reducing their prep volume.
+      Pay special attention to the reasonCode and disposalMethod in waste logs.
+      If 'OVERPRODUCTION' is high, suggest tighter par levels.
+      If 'STORAGE' or 'SPOILAGE' is high, suggest cooling checks or FIFO audits.
       If adjustments are needed, specify which items and why.
     `;
 
@@ -70,10 +72,10 @@ export class PrepAgentService {
     const prompt = `
       Based on this sales forecast: ${JSON.stringify(forecast)}
       This menu velocity: ${JSON.stringify(velocity)}
-      And this recent waste: ${JSON.stringify(wasteLogs)}
+      And this detailed recent waste: ${JSON.stringify(wasteLogs)}
       
       Generate a comprehensive daily prep list for a modern fast-casual restaurant.
-      Crucial: If an item has high waste, reduce the "forecastNeeded" slightly below historical levels to prevent future loss.
+      Crucial: Use the 'Learning Loop' - if an item has high 'OVERPRODUCTION' waste, reduce the "forecastNeeded" by 10-15% below historical levels.
       Focus on produce, proteins, and sauces.
     `;
 
