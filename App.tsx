@@ -45,16 +45,16 @@ async function decodeAudioData(data: Uint8Array, ctx: AudioContext, sampleRate: 
   return buffer;
 }
 
-// Fixed Tooltip Component: Always drops DOWN to ensure visibility
+// Fixed Tooltip Component: Strictly drops DOWN and aligns smartly
 const Tooltip: React.FC<{ what: string, source: string, why: string, align?: 'left' | 'right' | 'center' }> = ({ what, source, why, align = 'center' }) => {
   const alignClasses = {
     left: 'left-0 translate-x-0',
-    right: 'right-0 translate-x-0',
+    right: 'right-0 -translate-x-full left-full',
     center: 'left-1/2 -translate-x-1/2'
   };
   const arrowClasses = {
-    left: 'left-4',
-    right: 'right-4',
+    left: 'left-2',
+    right: 'right-2',
     center: 'left-1/2 -translate-x-1/2'
   };
 
@@ -63,7 +63,7 @@ const Tooltip: React.FC<{ what: string, source: string, why: string, align?: 'le
       <div className="cursor-help text-slate-400 hover:text-indigo-600 transition-colors">
         <Icons.Info />
       </div>
-      {/* Positioned at TOP-FULL to drop DOWN */}
+      {/* Positioned at TOP-FULL with MT-3 to strictly DROP DOWN */}
       <div className={`absolute top-full mt-3 hidden group-hover:block w-72 p-4 bg-slate-900 text-white text-[11px] rounded-2xl shadow-2xl z-[100] ${alignClasses[align]}`}>
         <div className="space-y-3">
           <div>
@@ -79,8 +79,8 @@ const Tooltip: React.FC<{ what: string, source: string, why: string, align?: 'le
             <p className="leading-relaxed opacity-90">{why}</p>
           </div>
         </div>
-        {/* Arrow positioned at bottom-full (relative to icon) but it's at the top of the tooltip box */}
-        <div className={`absolute bottom-full -mb-1 border-8 border-transparent border-b-slate-900 ${arrowClasses[align]}`}></div>
+        {/* Arrow points UP at the icon */}
+        <div className={`absolute bottom-full border-8 border-transparent border-b-slate-900 ${arrowClasses[align]}`}></div>
       </div>
     </div>
   );
@@ -93,7 +93,6 @@ const App: React.FC = () => {
   const [wasteLogs, setWasteLogs] = useState<WasteEntry[]>(INITIAL_WASTE);
   const [menuItems, setMenuItems] = useState<MenuItem[]>(MENU_ITEMS);
   
-  // Daypart-specific target volumes
   const [daypartVolumes, setDaypartVolumes] = useState({
     breakfast: 50,
     lunch: 120,
@@ -334,7 +333,6 @@ const App: React.FC = () => {
             <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
               <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
                 
-                {/* PMIX Summary Card */}
                 <div className="lg:col-span-1 space-y-6">
                   <div className="bg-white rounded-3xl border shadow-sm p-6 overflow-visible">
                     <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2">
@@ -368,18 +366,16 @@ const App: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Daypart Forecasters */}
                 <div className="lg:col-span-3 grid grid-cols-1 md:grid-cols-3 gap-6">
-                  {/* Breakfast Card */}
                   <div className="bg-amber-50 rounded-3xl border border-amber-100 p-6 flex flex-col justify-between relative overflow-visible shadow-sm">
                     <div>
                       <h3 className="font-bold text-amber-900 flex items-center gap-2">
                         🍳 Breakfast/Brunch
                         <Tooltip 
                           what="Prep targets specifically for the morning and brunch rush." 
-                          source="Historical sales patterns between 06:00 and 11:00." 
-                          why="High-velocity items like eggs and pastries require morning-fresh prep." 
-                          align="center"
+                          source="POS patterns (06:00 - 11:00)." 
+                          why="Items like eggs and pastries require daily morning-fresh prep." 
+                          align="left"
                         />
                       </h3>
                       <p className="text-[10px] text-amber-700 font-bold uppercase tracking-wider mt-1 opacity-70">Daypart Planning</p>
@@ -395,15 +391,14 @@ const App: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Lunch Card */}
                   <div className="bg-indigo-50 rounded-3xl border border-indigo-100 p-6 flex flex-col justify-between relative overflow-visible shadow-sm">
                     <div>
                       <h3 className="font-bold text-indigo-900 flex items-center gap-2">
                         ☀️ Lunch Rush
                         <Tooltip 
                           what="Prep targets for the highest volume shift." 
-                          source="POS velocity between 11:30 and 14:30." 
-                          why="Lunch requires peak mise en place to maintain turn times." 
+                          source="POS velocity (11:30 - 14:30)." 
+                          why="Lunch requires peak mise en place to maintain quick turn times." 
                           align="center"
                         />
                       </h3>
@@ -420,16 +415,15 @@ const App: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Dinner Card */}
                   <div className="bg-slate-50 rounded-3xl border border-slate-200 p-6 flex flex-col justify-between relative overflow-visible shadow-sm">
                     <div>
                       <h3 className="font-bold text-slate-900 flex items-center gap-2">
                         🌙 Dinner Service
                         <Tooltip 
                           what="Prep targets for the evening service." 
-                          source="Historical peaks between 17:00 and 22:00." 
-                          why="Dinner often involves more complex prep items and larger portion sizes." 
-                          align="center"
+                          source="POS peaks (17:00 - 22:00)." 
+                          why="Dinner often involves complex prep and larger portion sizes." 
+                          align="right"
                         />
                       </h3>
                       <p className="text-[10px] text-slate-700 font-bold uppercase tracking-wider mt-1 opacity-70">Daypart Planning</p>
@@ -447,16 +441,15 @@ const App: React.FC = () => {
                 </div>
               </div>
 
-              {/* Volume Explosion Table */}
               <div className="bg-white rounded-3xl border shadow-sm overflow-visible">
                 <div className="p-6 border-b bg-slate-50 rounded-t-3xl flex justify-between items-center">
                   <h3 className="font-bold text-slate-900">
                     Volume Explosion (Aggregated Daily)
                     <Tooltip 
-                      what="Total daily ingredient requirements based on all daypart forecasts combined." 
-                      source="Recipe explosion x (Breakfast + Lunch + Dinner volumes)." 
-                      why="Provides a single consolidated list for morning prep teams." 
-                      align="right"
+                      what="Daily ingredient requirements for all daypart forecasts combined." 
+                      source="Recipe explosion x total daily volume." 
+                      why="Provides a single consolidated target for morning prep teams." 
+                      align="left"
                     />
                   </h3>
                   <div className="flex gap-4 items-center">
@@ -468,7 +461,7 @@ const App: React.FC = () => {
                 </div>
                 <div className="divide-y">
                   {pmixCalculations.map(item => (
-                    <div key={item.id} className="p-6 space-y-4 hover:bg-slate-50 transition-colors">
+                    <div key={item.id} className="p-6 space-y-4 hover:bg-slate-50 transition-colors overflow-visible">
                       <div className="flex justify-between items-start">
                         <div>
                           <h4 className="text-lg font-bold text-slate-900">{item.name}</h4>
@@ -478,7 +471,7 @@ const App: React.FC = () => {
                           <span className="text-xs font-bold bg-indigo-50 text-indigo-600 px-3 py-1 rounded-full uppercase">PMix {(item.productMix * 100).toFixed(0)}%</span>
                         </div>
                       </div>
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 overflow-visible">
                         {item.ingredientsNeeded.map((ing, idx) => (
                           <div key={idx} className="bg-white border border-slate-100 rounded-2xl p-4 shadow-sm flex flex-col items-center text-center group hover:border-indigo-200 transition-colors">
                             <span className="text-[10px] text-slate-400 uppercase font-black mb-1 group-hover:text-indigo-400">{ing.name}</span>
@@ -489,66 +482,6 @@ const App: React.FC = () => {
                     </div>
                   ))}
                 </div>
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'preplist' && (
-            <div className="bg-white border rounded-2xl shadow-sm overflow-visible animate-in fade-in slide-in-from-bottom-4 duration-500">
-              <div className="p-4 border-b bg-slate-50 rounded-t-2xl flex items-center justify-between">
-                <h3 className="font-bold text-slate-900">
-                  Active Prep Queue
-                  <Tooltip 
-                    what="Consolidated list of all required prep tasks." 
-                    source="Aggregated from PMIX forecasting and inventory levels." 
-                    why="Primary workspace for kitchen staff to track production." 
-                    align="left"
-                  />
-                </h3>
-                <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-1 rounded-full font-bold">Dynamic Refresh</span>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-left">
-                  <thead className="bg-slate-50 border-b text-xs text-slate-500 uppercase">
-                    <tr>
-                      <th className="px-6 py-4 font-semibold">Item</th>
-                      <th className="px-6 py-4 font-semibold">Prep Required</th>
-                      <th className="px-6 py-4 font-semibold">Priority</th>
-                      <th className="px-6 py-4 font-semibold">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y text-sm">
-                    {prepItems.map((item) => (
-                      <tr key={item.id} className="hover:bg-slate-50 transition-colors group">
-                        <td className="px-6 py-4">
-                          <div className="font-medium text-slate-900">{item.name}</div>
-                          <div className="text-xs text-slate-500">{item.category}</div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <span className="font-bold text-indigo-600">{item.prepNeeded} {item.unit}</span>
-                        </td>
-                        <td className="px-6 py-4">
-                          <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase ${
-                            item.priority === 'High' ? 'bg-rose-50 text-rose-600' : 'bg-slate-100 text-slate-600'
-                          }`}>
-                            {item.priority}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4">
-                          <button 
-                            onClick={() => toggleItemStatus(item.id)}
-                            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-all ${
-                              item.status === 'Completed' ? 'bg-emerald-50 border-emerald-100 text-emerald-700' : 'bg-white text-slate-500 hover:border-indigo-200'
-                            }`}
-                          >
-                            {item.status === 'Completed' && <Icons.Check />}
-                            {item.status}
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
               </div>
             </div>
           )}
@@ -586,9 +519,9 @@ const App: React.FC = () => {
                    <h3 className="text-slate-500 text-sm font-medium mb-1">
                      Low Stock Alerts
                      <Tooltip 
-                        what="Raw materials that have fallen below your preset 'Par Levels' based on upcoming meal forecasts." 
-                        source="Live Inventory Management System (IMS) counts." 
-                        why="Ensures you never '86' a menu item during peak service." 
+                        what="Ingredients below preset 'Par Levels' for upcoming forecasts." 
+                        source="Live IMS counts." 
+                        why="Prevents '86ing' menu items during peaks." 
                         align="left"
                       />
                    </h3>
@@ -599,9 +532,9 @@ const App: React.FC = () => {
                    <h3 className="text-slate-500 text-sm font-medium mb-1">
                      Daily Forecast
                      <Tooltip 
-                        what="An AI-driven prediction of total sales revenue for the current daypart." 
-                        source="Predictive Sales Models + Historical POS Averages." 
-                        why="Determines the 'Prep Volume' target for the morning shift." 
+                        what="AI-driven prediction of total sales revenue." 
+                        source="Predictive Models + Historical POS." 
+                        why="Determines total production targets." 
                         align="center"
                       />
                    </h3>
@@ -612,9 +545,9 @@ const App: React.FC = () => {
                    <h3 className="text-slate-500 text-sm font-medium mb-1">
                      Waste Logs
                      <Tooltip 
-                        what="A record of prepped or raw food discarded due to spoilage, drops, or expiration." 
-                        source="Manual Kitchen Waste Tracking entries." 
-                        why="Helps the AI identify 'Over-Prep' patterns to reduce future food costs." 
+                        what="Food discarded due to spoilage or over-prep." 
+                        source="Manual Kitchen Waste tracking." 
+                        why="Identifies 'Over-Prep' patterns to reduce costs." 
                         align="right"
                       />
                    </h3>
@@ -626,9 +559,9 @@ const App: React.FC = () => {
                 <h3 className="font-bold text-slate-900 mb-6">
                   Historical Demand Visualization
                   <Tooltip 
-                    what="A chart comparing predicted sales vs. actual sales outcomes." 
-                    source="Aggregated Point of Sale (POS) and Forecaster Data." 
-                    why="Used to verify AI accuracy and identify seasonal trends." 
+                    what="Chart comparing predicted vs actual sales." 
+                    source="POS and Forecaster Data." 
+                    why="Used to verify AI accuracy." 
                     align="left"
                   />
                 </h3>
@@ -643,15 +576,15 @@ const App: React.FC = () => {
                 <h3 className="font-bold text-slate-900">
                   Inventory Status
                   <Tooltip 
-                    what="Current counts of raw materials prior to any daily prep." 
-                    source="Digital Inventory Sync (IMS)." 
-                    why="The starting point for all prep calculations; you can't prep what you don't have." 
+                    what="Current raw material counts prior to daily prep." 
+                    source="Digital IMS Sync." 
+                    why="The starting point for all prep logic." 
                     align="left"
                   />
                 </h3>
                 <button className="text-sm bg-white border border-slate-200 px-3 py-1.5 rounded-lg font-semibold hover:bg-slate-50 transition-colors shadow-sm">Manual Update</button>
               </div>
-              <div className="divide-y">
+              <div className="divide-y overflow-visible">
                 {inventory.map(item => (
                   <div key={item.id} className="p-6 flex justify-between items-center hover:bg-slate-50">
                     <div>
@@ -662,7 +595,6 @@ const App: React.FC = () => {
                       <p className={`font-bold ${item.currentStock < item.threshold ? 'text-rose-600' : 'text-slate-700'}`}>
                         {item.currentStock} / {item.threshold} {item.unit}
                       </p>
-                      {item.currentStock < item.threshold && <span className="text-[10px] font-bold text-rose-500 uppercase">Reorder ASAP</span>}
                     </div>
                   </div>
                 ))}
@@ -671,8 +603,8 @@ const App: React.FC = () => {
           )}
         </div>
         
-        {/* Mobile Navigation Bar */}
-        <div className="md:hidden bg-white border-t flex justify-around p-3 pb-6 shrink-0">
+        {/* Mobile Navigation */}
+        <div className="md:hidden bg-white border-t flex justify-around p-3 pb-6 shrink-0 z-50">
           <button onClick={() => setActiveTab('dashboard')} className={activeTab === 'dashboard' ? 'text-indigo-600' : 'text-slate-400'}><Icons.Dashboard /></button>
           <button onClick={() => setActiveTab('preplist')} className={activeTab === 'preplist' ? 'text-indigo-600' : 'text-slate-400'}><Icons.ChefHat /></button>
           <button onClick={() => setActiveTab('pmix')} className={activeTab === 'pmix' ? 'text-indigo-600' : 'text-slate-400'}><Icons.Trend /></button>
