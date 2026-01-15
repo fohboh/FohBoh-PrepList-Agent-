@@ -341,6 +341,119 @@ const App: React.FC = () => {
             </div>
           )}
 
+          {activeTab === 'pmix' && (
+            <div className="max-w-7xl mx-auto space-y-12 animate-in pb-20">
+              <div className="flex flex-col md:flex-row justify-between items-end gap-4 border-b-8 border-slate-900 pb-6">
+                <div>
+                   <h2 className="text-5xl font-black text-slate-900 tracking-tight uppercase">Volume Explosion Grid</h2>
+                   <p className="text-indigo-600 font-black uppercase tracking-widest text-xs">Section 5: Menu Mix Extrapolation</p>
+                </div>
+                <div className="bg-slate-900 text-white px-8 py-3 rounded-2xl font-black uppercase tracking-widest text-[10px]">
+                   Target Covers: {totalTargetVolume}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                {menuItems.map(item => (
+                  <div key={item.id} className="bg-white border-4 border-slate-900 rounded-[3rem] shadow-xl overflow-hidden group hover:shadow-2xl transition-all">
+                    <div className="p-8 bg-slate-50 border-b-4 border-slate-900 flex justify-between items-start">
+                      <p className="font-black text-slate-900 text-2xl uppercase tracking-tight leading-none">{item.name}</p>
+                      <span className="bg-indigo-600 text-white text-[10px] font-black px-4 py-1 rounded-full uppercase tracking-widest">{(item.productMix * 100).toFixed(0)}% PMix</span>
+                    </div>
+                    <div className="p-10 space-y-8">
+                       <div className="flex items-end gap-3">
+                         <p className="text-7xl font-black text-slate-950 leading-none tracking-tighter">{Math.round(totalTargetVolume * item.productMix)}</p>
+                         <p className="text-sm font-black text-slate-400 uppercase tracking-widest mb-2">Portions</p>
+                       </div>
+                       <div className="h-16 border-2 rounded-2xl p-2 bg-slate-50"><MiniTrendChart data={item.history7Days} /></div>
+                       <div className="pt-8 border-t-4 border-dotted border-slate-200 space-y-4">
+                          <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest flex items-center gap-2">
+                             <Icons.Search /> Ingredient Drag Breakdown
+                          </p>
+                          <div className="space-y-3">
+                            {item.ingredients.map(ing => (
+                              <div key={ing.prepItemId} className="flex justify-between text-sm font-black items-center">
+                                <span className="text-slate-500 uppercase tracking-tight">{prepItems.find(p => p.id === ing.prepItemId)?.name}</span>
+                                <span className="text-slate-950 bg-indigo-50 px-4 py-1.5 rounded-xl border-2 border-indigo-100 italic">{(Math.round(totalTargetVolume * item.productMix) * ing.amountPerUnit).toFixed(1)} {prepItems.find(p => p.id === ing.prepItemId)?.unit}</span>
+                              </div>
+                            ))}
+                          </div>
+                       </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'waste' && (
+            <div className="max-w-6xl mx-auto space-y-12 animate-in pb-20">
+              <div className="flex flex-col md:flex-row justify-between items-end gap-6 border-b-8 border-slate-900 pb-8">
+                <div>
+                   <h2 className="text-6xl font-black text-slate-900 tracking-tight uppercase">Waste Analysis</h2>
+                   <p className="text-rose-600 font-black uppercase tracking-widest text-xs">Section 6: Adaptive Correction Engine</p>
+                </div>
+                <button onClick={() => setShowWasteForm(true)} className="bg-rose-600 text-white px-10 py-5 rounded-[2rem] font-black text-lg shadow-2xl hover:bg-rose-700 transition-all active:scale-95">Log Waste Event</button>
+              </div>
+
+              {showWasteForm && (
+                <div className="bg-white border-8 border-rose-600 rounded-[4rem] p-12 shadow-[0_35px_60px_-15px_rgba(225,29,72,0.3)] space-y-10 animate-in zoom-in duration-300 relative z-40">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
+                    <div className="space-y-3">
+                      <label className="text-xs font-black text-slate-950 uppercase tracking-widest block">Item Name</label>
+                      <select className="w-full bg-slate-50 border-4 border-slate-950 rounded-[1.5rem] px-6 py-5 text-xl font-black text-black outline-none focus:bg-white" onChange={(e) => setNewWaste({...newWaste, itemName: e.target.value})}>
+                        <option value="">Select Item...</option>
+                        {prepItems.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
+                      </select>
+                    </div>
+                    <div className="space-y-3">
+                      <label className="text-xs font-black text-slate-950 uppercase tracking-widest block">Logged Qty (kg)</label>
+                      <input type="number" className="w-full bg-slate-50 border-4 border-slate-950 rounded-[1.5rem] px-6 py-5 text-xl font-black text-black outline-none focus:bg-white" placeholder="0.0" onChange={(e) => setNewWaste({...newWaste, quantity: Number(e.target.value)})} />
+                    </div>
+                    <div className="space-y-3">
+                      <label className="text-xs font-black text-slate-950 uppercase tracking-widest block">Reason Code</label>
+                      <select className="w-full bg-slate-50 border-4 border-slate-950 rounded-[1.5rem] px-6 py-5 text-xl font-black text-black outline-none focus:bg-white" onChange={(e) => setNewWaste({...newWaste, reasonCode: (e.target.value as WasteReasonCode)})}>
+                        <option value="OVERPRODUCTION">OVERPRODUCTION</option>
+                        <option value="SPOILAGE">SPOILAGE</option>
+                        <option value="PREP_ERROR">PREP_ERROR</option>
+                        <option value="STORAGE">STORAGE</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div className="flex justify-end gap-5">
+                    <button onClick={() => setShowWasteForm(false)} className="text-slate-500 font-black uppercase text-sm px-8">Cancel</button>
+                    <button onClick={logWasteEntry} className="bg-slate-900 text-white px-12 py-5 rounded-[2rem] font-black text-lg hover:bg-rose-600 transition-colors shadow-xl">Commit to Ledger</button>
+                  </div>
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                <div className="bg-slate-950 p-12 rounded-[4rem] text-white space-y-2">
+                  <p className="text-slate-500 font-black uppercase tracking-widest text-[11px]">Period Loss Impact</p>
+                  <p className="text-8xl font-black tracking-tighter text-rose-500 italic leading-none">${totalWasteCost.toFixed(2)}</p>
+                  <p className="text-slate-400 font-medium pt-4">Calculated across {wasteLogs.length} recent events.</p>
+                </div>
+                <div className="bg-white border-4 border-slate-900 p-10 rounded-[4rem] space-y-6">
+                  <p className="font-black text-slate-950 uppercase tracking-widest text-[11px] border-b-2 border-slate-100 pb-4">Recent Entry Logs</p>
+                  <div className="space-y-5 max-h-[300px] overflow-y-auto pr-4 custom-scrollbar">
+                    {wasteLogs.map(log => (
+                      <div key={log.id} className="flex justify-between items-center p-6 bg-slate-50 rounded-[2rem] border-2 border-slate-100 hover:border-rose-200 transition-colors">
+                        <div>
+                          <p className="font-black text-slate-900 text-lg uppercase leading-none mb-1">{log.itemName}</p>
+                          <p className="text-[10px] font-black text-rose-500 uppercase tracking-widest">{log.reasonCode} • {log.shift} Shift</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-black text-slate-950 text-xl leading-none">-{log.quantity} {log.unit}</p>
+                          <p className="text-[11px] font-black text-slate-400 uppercase tracking-tight italic">Cost: ${log.totalCost.toFixed(2)}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {activeTab === 'preplist' && (
             <div className="max-w-7xl mx-auto space-y-10 animate-in pb-10">
               <div className="flex justify-between items-end border-b-8 border-slate-900 pb-6">
@@ -472,7 +585,6 @@ const App: React.FC = () => {
             </div>
           )}
 
-          {/* Restored Inputs (High Contrast) */}
           {activeTab === 'inputs' && (
             <div className="max-w-6xl mx-auto space-y-12 animate-in pb-20">
               <div className="flex justify-between items-end border-b-8 border-slate-900 pb-6">
@@ -534,7 +646,6 @@ const App: React.FC = () => {
             </div>
           )}
 
-          {/* Restored Help/FAQ (High Contrast) */}
           {activeTab === 'help' && (
             <div className="max-w-5xl mx-auto space-y-16 animate-in pb-20">
               <div className="text-center space-y-4 border-b-8 border-slate-900 pb-10">
