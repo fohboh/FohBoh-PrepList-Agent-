@@ -207,9 +207,25 @@ const App: React.FC = () => {
   const [currentUserText, setCurrentUserText] = useState('');
   const sessionRef = useRef<any>(null);
 
+  // Refs for audio state management as per Live API guidelines
+  const nextStartTimeRef = useRef(0);
+  const outputAudioContextRef = useRef<AudioContext | null>(null);
+  const outputNodeRef = useRef<GainNode | null>(null);
+  const sourcesRef = useRef<Set<AudioBufferSourceNode>>(new Set());
+
   const startLiveSession = async () => {
     if (isLiveActive) { sessionRef.current?.close(); setIsLiveActive(false); return; }
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
+    
+    // Correctly initialize with process.env.API_KEY directly as per guidelines
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    
+    // Initialize audio contexts for output if not already done
+    if (!outputAudioContextRef.current) {
+      outputAudioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
+      outputNodeRef.current = outputAudioContextRef.current.createGain();
+      outputNodeRef.current.connect(outputAudioContextRef.current.destination);
+    }
+    
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     
     const sessionPromise = ai.live.connect({
@@ -217,16 +233,45 @@ const App: React.FC = () => {
       callbacks: {
         onopen: () => setIsLiveActive(true),
         onmessage: async (message: LiveServerMessage) => {
+          // Handle transcriptions if present
           if (message.serverContent?.outputTranscription) setCurrentAgentText(p => p + message.serverContent!.outputTranscription!.text);
           else if (message.serverContent?.inputTranscription) setCurrentUserText(p => p + message.serverContent!.inputTranscription!.text);
+          
           if (message.serverContent?.turnComplete) { 
             setTranscription(prev => [...prev, { user: currentUserText, agent: currentAgentText }]); 
             setCurrentUserText(''); setCurrentAgentText(''); 
+          }
+
+          // Handle audio output from the model as per guidelines
+          const base64Audio = message.serverContent?.modelTurn?.parts[0]?.inlineData?.data;
+          if (base64Audio && outputAudioContextRef.current && outputNodeRef.current) {
+            const ctx = outputAudioContextRef.current;
+            nextStartTimeRef.current = Math.max(nextStartTimeRef.current, ctx.currentTime);
+            
+            const audioBuffer = await decodeAudioData(decode(base64Audio), ctx, 24000, 1);
+            const source = ctx.createBufferSource();
+            source.buffer = audioBuffer;
+            source.connect(outputNodeRef.current);
+            source.addEventListener('ended', () => {
+              sourcesRef.current.delete(source);
+            });
+            source.start(nextStartTimeRef.current);
+            nextStartTimeRef.current += audioBuffer.duration;
+            sourcesRef.current.add(source);
+          }
+
+          if (message.serverContent?.interrupted) {
+            for (const source of sourcesRef.current.values()) {
+              source.stop();
+              sourcesRef.current.delete(source);
+            }
+            nextStartTimeRef.current = 0;
           }
         },
         onclose: () => setIsLiveActive(false),
       },
       config: {
+        // Fixed typo 'responseModalalities'
         responseModalities: [Modality.AUDIO],
         outputAudioTranscription: {},
         inputAudioTranscription: {},
@@ -287,6 +332,32 @@ const App: React.FC = () => {
                     <div className={`w-14 h-14 ${feature.color} text-white rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform shadow-lg`}>{feature.icon}</div>
                     <h4 className="text-xl font-black text-slate-900 mb-2 uppercase tracking-tight">{feature.title}</h4>
                     <p className="text-slate-600 font-medium text-sm leading-relaxed">{feature.desc}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'get-started' && (
+            <div className="max-w-4xl mx-auto space-y-16 animate-in pb-20">
+              <div className="text-center space-y-4">
+                <h2 className="text-5xl font-black text-slate-900 tracking-tight">Sync Your Kitchen</h2>
+                <p className="text-slate-600 text-xl font-medium">Complete these 4 critical steps for today's service.</p>
+              </div>
+              <div className="relative space-y-12 before:absolute before:left-10 before:top-10 before:bottom-10 before:w-2 before:bg-indigo-100 before:-z-10">
+                {[
+                  { step: 1, title: "Configure Forecasts", desc: "Enter meal counts for Breakfast, Lunch, and Dinner. Rules applied instantly.", tab: "inputs", action: "Go to Inputs" },
+                  { step: 2, title: "Verify On-Hand Stock", desc: "Confirm current inventory levels to calculate final 'Prep-Need' delta.", tab: "inventory", action: "Update Inventory" },
+                  { step: 3, title: "Execute Prep List", desc: "Review prioritized tasks sorted by station and knife-skill level.", tab: "preplist", action: "View Prep List" },
+                  { step: 4, title: "Analyze & Log Waste", desc: "Close the loop by logging overprep. System learns and adjusts for tomorrow.", tab: "waste", action: "Review Waste" }
+                ].map((item, i) => (
+                  <div key={i} className="flex gap-10 items-start group">
+                    <div className="w-20 h-20 rounded-full bg-white border-8 border-indigo-600 flex items-center justify-center text-indigo-600 font-black text-2xl shadow-2xl shrink-0 group-hover:scale-110 transition-transform">{item.step}</div>
+                    <div className="bg-white p-10 rounded-[3rem] border-4 border-slate-100 shadow-xl flex-1 hover:border-indigo-600 transition-all">
+                      <h4 className="text-2xl font-black text-slate-900 mb-3 uppercase tracking-tight">{item.title}</h4>
+                      <p className="text-slate-600 font-medium mb-8 text-lg">{item.desc}</p>
+                      <button onClick={() => setActiveTab(item.tab)} className="bg-slate-900 text-white px-8 py-4 rounded-2xl font-black hover:bg-indigo-600 transition-all shadow-lg active:scale-95">{item.action}</button>
+                    </div>
                   </div>
                 ))}
               </div>

@@ -6,7 +6,8 @@ export class PrepAgentService {
   private ai: GoogleGenAI;
 
   constructor() {
-    this.ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
+    // Correctly initialize with process.env.API_KEY as per guidelines
+    this.ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   }
 
   async getInsights(
