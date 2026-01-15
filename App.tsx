@@ -56,7 +56,7 @@ const Tooltip: React.FC<{ what: string, source: string, why: string, align?: 'le
 };
 
 const App: React.FC = () => {
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [activeTab, setActiveTab] = useState('home');
   const [prepItems, setPrepItems] = useState<PrepItem[]>(INITIAL_PREP_ITEMS);
   const [inventory, setInventory] = useState<InventoryItem[]>(INITIAL_INVENTORY);
   const [wasteLogs, setWasteLogs] = useState<WasteEntry[]>(INITIAL_WASTE);
@@ -211,21 +211,132 @@ const App: React.FC = () => {
       <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
       
       <main className="flex-1 md:ml-64 flex flex-col h-screen overflow-hidden">
-        <header className="p-4 md:p-6 bg-white border-b flex justify-between items-center shrink-0">
+        <header className="p-4 md:p-6 bg-white border-b flex justify-between items-center shrink-0 shadow-sm relative z-10">
           <div>
             <h1 className="text-xl font-bold text-slate-900 flex items-center gap-2">
               <span className="p-1.5 bg-indigo-600 text-white rounded-lg"><Icons.ChefHat /></span>
               PrepList Agent™
             </h1>
-            <p className="text-xs text-slate-500 font-medium">Deterministic Kitchen Control System</p>
+            <p className="text-xs text-slate-500 font-medium uppercase tracking-wider">Deterministic Kitchen Intelligence</p>
           </div>
-          <button onClick={startLiveSession} className={`flex items-center gap-2 px-6 py-2 rounded-full font-bold transition-all shadow-lg ${isLiveActive ? 'bg-rose-500 text-white animate-pulse' : 'bg-indigo-600 text-white hover:bg-indigo-700'}`}>
+          <button onClick={startLiveSession} className={`flex items-center gap-2 px-6 py-2 rounded-full font-bold transition-all shadow-lg active:scale-95 ${isLiveActive ? 'bg-rose-500 text-white animate-pulse' : 'bg-indigo-600 text-white hover:bg-indigo-700'}`}>
             {isLiveActive ? <Icons.MicOff /> : <Icons.Mic />}
             {isLiveActive ? 'Listening...' : 'Talk to Agent'}
           </button>
         </header>
 
         <div className="flex-1 overflow-y-auto p-4 md:p-8 space-y-8">
+          
+          {activeTab === 'home' && (
+            <div className="max-w-6xl mx-auto space-y-16 animate-in fade-in duration-700 pb-20">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center mt-8">
+                <div className="space-y-6">
+                  <div className="inline-block bg-indigo-50 text-indigo-700 px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-widest border border-indigo-100">Welcome to FohBoh™</div>
+                  <h2 className="text-5xl md:text-6xl font-black text-slate-900 leading-[1.1]">The Future of <span className="text-indigo-600">Kitchen Execution.</span></h2>
+                  <p className="text-lg text-slate-500 max-w-lg leading-relaxed">PrepList Agent™ combines deterministic rules with AI-driven sales forecasting to ensure your kitchen is always ready, never over-prepped, and perfectly synchronized.</p>
+                  <div className="flex flex-wrap gap-4 pt-4">
+                    <button onClick={() => setActiveTab('get-started')} className="bg-emerald-500 hover:bg-emerald-600 text-white px-8 py-4 rounded-2xl font-black shadow-xl shadow-emerald-100 transition-all flex items-center gap-3 active:scale-95">Get Started Now <Icons.Check /></button>
+                    <button onClick={() => setActiveTab('dashboard')} className="bg-white border-2 border-slate-200 text-slate-900 px-8 py-4 rounded-2xl font-black hover:bg-slate-50 transition-all active:scale-95">View Dashboard</button>
+                  </div>
+                </div>
+                <div className="relative">
+                  <div className="aspect-square bg-indigo-600/5 rounded-[3rem] p-8 flex items-center justify-center relative overflow-hidden">
+                    <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-600 rounded-full blur-[100px] opacity-10"></div>
+                    <div className="bg-white rounded-3xl shadow-2xl p-6 border-2 border-indigo-50 w-full relative z-10 transform -rotate-3 hover:rotate-0 transition-transform duration-500">
+                      <div className="flex justify-between items-center mb-6">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 bg-indigo-100 rounded-xl flex items-center justify-center text-indigo-600 font-black">AI</div>
+                          <div>
+                            <p className="font-bold text-slate-900">Agent Analysis</p>
+                            <p className="text-[10px] text-slate-400 font-black">RECOMMENDATION</p>
+                          </div>
+                        </div>
+                        <div className="px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full text-[10px] font-black tracking-tighter uppercase">99% Confidence</div>
+                      </div>
+                      <p className="text-sm text-slate-600 italic leading-relaxed">"Based on the Downtown Farmers Market event tomorrow, I've increased 'Diced Onions' prep by 15%. This matches your historical 20% spike during similar events."</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                {[
+                  { title: "Reduce Waste", desc: "Automated adjustments based on historical overprep logs.", icon: <Icons.Trash />, color: "bg-rose-50 text-rose-600" },
+                  { title: "Boost Efficiency", desc: "Station-specific tasks sorted by priority and knife-skill level.", icon: <Icons.ChefHat />, color: "bg-indigo-50 text-indigo-600" },
+                  { title: "Deterministic Logic", desc: "Hard rules paired with AI insights for 100% reliable pars.", icon: <Icons.Dashboard />, color: "bg-emerald-50 text-emerald-600" }
+                ].map((feature, i) => (
+                  <div key={i} className="bg-white p-8 rounded-3xl border border-slate-100 shadow-sm hover:shadow-xl transition-all group">
+                    <div className={`w-14 h-14 ${feature.color} rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform`}>{feature.icon}</div>
+                    <h4 className="text-xl font-bold text-slate-900 mb-2">{feature.title}</h4>
+                    <p className="text-slate-500 text-sm leading-relaxed">{feature.desc}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'get-started' && (
+            <div className="max-w-4xl mx-auto space-y-12 animate-in fade-in duration-500 pb-20">
+              <div className="text-center space-y-4">
+                <h2 className="text-4xl font-black text-slate-900">Complete Your PrepList</h2>
+                <p className="text-slate-500 text-lg">Follow these 4 steps to synchronize your kitchen for today's service.</p>
+              </div>
+
+              <div className="relative space-y-12 before:absolute before:left-8 before:top-8 before:bottom-8 before:w-1 before:bg-slate-100 before:-z-10">
+                {[
+                  { 
+                    step: 1, 
+                    title: "Configure Daily Forecast", 
+                    desc: "Enter your projected meal counts and average checks for each daypart. Add any local events that might spike traffic.",
+                    tab: "inputs",
+                    icon: <Icons.Search />,
+                    action: "Go to Inputs"
+                  },
+                  { 
+                    step: 2, 
+                    title: "Sync Inventory Levels", 
+                    desc: "Ensure your current counts in the system match your walk-in shelf reality. AI uses this 'On-Hand' delta for prep targets.",
+                    tab: "inventory",
+                    icon: <Icons.Inventory />,
+                    action: "Verify Inventory"
+                  },
+                  { 
+                    step: 3, 
+                    title: "Review & Adjust Prep Needs", 
+                    desc: "The engine automatically explodes your P-Mix across your cover target. Review station assignments and AI suggestions.",
+                    tab: "preplist",
+                    icon: <Icons.ChefHat />,
+                    action: "Review Prep List"
+                  },
+                  { 
+                    step: 4, 
+                    title: "Execute & Mark Complete", 
+                    desc: "Hand off the digital list to your team. As they complete tasks, track completion in real-time on your dashboard.",
+                    tab: "dashboard",
+                    icon: <Icons.Dashboard />,
+                    action: "Go to Dashboard"
+                  }
+                ].map((item, i) => (
+                  <div key={i} className="flex gap-8 items-start animate-in fade-in slide-in-from-left-4" style={{ animationDelay: `${i * 100}ms` }}>
+                    <div className="w-16 h-16 rounded-full bg-white border-4 border-emerald-500 flex items-center justify-center text-emerald-500 font-black text-xl shadow-lg shrink-0">
+                      {item.step}
+                    </div>
+                    <div className="bg-white p-8 rounded-3xl border shadow-sm flex-1 hover:border-emerald-500 transition-colors group">
+                      <div className="flex items-center gap-3 mb-2">
+                        <div className="text-slate-400 group-hover:text-emerald-500 transition-colors">{item.icon}</div>
+                        <h4 className="text-xl font-bold text-slate-900">{item.title}</h4>
+                      </div>
+                      <p className="text-slate-500 text-sm leading-relaxed mb-6">{item.desc}</p>
+                      <button onClick={() => setActiveTab(item.tab)} className="bg-slate-900 text-white px-6 py-2.5 rounded-xl text-sm font-bold hover:bg-indigo-600 transition-colors flex items-center gap-2 group/btn">
+                        {item.action}
+                        <Icons.Trend />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
           
           {activeTab === 'dashboard' && (
             <div className="space-y-6 max-w-7xl mx-auto animate-in fade-in duration-500">
@@ -584,10 +695,10 @@ const App: React.FC = () => {
         </div>
         
         <div className="md:hidden bg-white border-t flex justify-around p-3 pb-6 shrink-0 z-50">
-          <button onClick={() => setActiveTab('dashboard')} className={activeTab === 'dashboard' ? 'text-indigo-600' : 'text-slate-400'}><Icons.Dashboard /></button>
+          <button onClick={() => setActiveTab('home')} className={activeTab === 'home' ? 'text-indigo-600' : 'text-slate-400'}><Icons.Dashboard /></button>
+          <button onClick={() => setActiveTab('get-started')} className={activeTab === 'get-started' ? 'text-emerald-500' : 'text-slate-400'}><Icons.Check /></button>
           <button onClick={() => setActiveTab('inputs')} className={activeTab === 'inputs' ? 'text-indigo-600' : 'text-slate-400'}><Icons.Search /></button>
           <button onClick={() => setActiveTab('preplist')} className={activeTab === 'preplist' ? 'text-indigo-600' : 'text-slate-400'}><Icons.ChefHat /></button>
-          <button onClick={() => setActiveTab('pmix')} className={activeTab === 'pmix' ? 'text-indigo-600' : 'text-slate-400'}><Icons.Trend /></button>
           <button onClick={() => setActiveTab('agent')} className={activeTab === 'agent' ? 'text-indigo-600 scale-125' : 'text-slate-400'}><Icons.Bot /></button>
         </div>
       </main>
