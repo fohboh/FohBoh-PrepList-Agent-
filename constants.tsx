@@ -3,30 +3,48 @@ import React from 'react';
 import { PrepItem, ForecastData, VelocityMetric, InventoryItem, WasteEntry, MenuItem } from './types';
 
 export const INITIAL_PREP_ITEMS: PrepItem[] = [
-  { id: '1', name: 'Diced Onions', category: 'Produce', unit: 'kg', currentStock: 0.5, forecastNeeded: 5.0, prepNeeded: 4.5, status: 'Pending', priority: 'High' },
-  { id: '2', name: 'Marinated Chicken Breast', category: 'Protein', unit: 'kg', currentStock: 2.0, forecastNeeded: 12.0, prepNeeded: 10.0, status: 'In-Progress', priority: 'High', assignedTo: 'Chef Marco' },
-  { id: '3', name: 'House Balsamic Vinaigrette', category: 'Sauce', unit: 'L', currentStock: 0.8, forecastNeeded: 2.0, prepNeeded: 1.2, status: 'Completed', priority: 'Medium' },
-  { id: '4', name: 'Shredded Romaine', category: 'Produce', unit: 'bags', currentStock: 1.0, forecastNeeded: 8.0, prepNeeded: 7.0, status: 'Pending', priority: 'High' },
+  { 
+    id: '1', name: 'Diced Onions', category: 'Produce', station: 'Garde Manger', unit: 'kg', 
+    currentStock: 0.5, forecastNeeded: 5.0, prepNeeded: 4.5, status: 'Pending', 
+    priority: 'Medium', dueBy: '10:30 AM', shelfLifeDays: 2, requiresKnifeSkills: 4, costPerUnit: 1.20 
+  },
+  { 
+    id: '2', name: 'Marinated Chicken', category: 'Protein', station: 'Butchery', unit: 'kg', 
+    currentStock: 2.0, forecastNeeded: 12.0, prepNeeded: 10.0, status: 'In-Progress', 
+    priority: 'High', assignedTo: 'Marco', dueBy: '11:30 AM', shelfLifeDays: 3, requiresKnifeSkills: 7, costPerUnit: 8.50 
+  },
+  { 
+    id: '3', name: 'House Balsamic', category: 'Sauce', station: 'General Prep', unit: 'L', 
+    currentStock: 0.8, forecastNeeded: 2.0, prepNeeded: 1.2, status: 'Completed', 
+    priority: 'Medium', dueBy: '10:00 AM', shelfLifeDays: 7, requiresKnifeSkills: 2, costPerUnit: 4.50 
+  },
+  { 
+    id: '4', name: 'Shredded Romaine', category: 'Produce', station: 'Garde Manger', unit: 'heads', 
+    currentStock: 1.0, forecastNeeded: 8.0, prepNeeded: 7.0, status: 'Pending', 
+    priority: 'High', dueBy: '11:00 AM', shelfLifeDays: 1, requiresKnifeSkills: 3, costPerUnit: 0.95 
+  },
+  { 
+    id: '5', name: 'NY Strip Steaks', category: 'Protein', station: 'Butchery', unit: 'portions', 
+    currentStock: 5.0, forecastNeeded: 30.0, prepNeeded: 25.0, status: 'Pending', 
+    priority: 'High', dueBy: '12:00 PM', shelfLifeDays: 3, requiresKnifeSkills: 9, costPerUnit: 14.00 
+  }
 ];
 
 export const MENU_ITEMS: MenuItem[] = [
   { 
-    id: 'm1', 
-    name: 'Chicken Bowl', 
-    productMix: 0.45, 
+    id: 'm1', name: 'Chicken Bowl', productMix: 0.45, 
+    history7Days: [0.42, 0.44, 0.43, 0.46, 0.45, 0.47, 0.45],
     ingredients: [{ prepItemId: '2', amountPerUnit: 0.15 }, { prepItemId: '1', amountPerUnit: 0.05 }] 
   },
   { 
-    id: 'm2', 
-    name: 'Caesar Salad', 
-    productMix: 0.30, 
-    ingredients: [{ prepItemId: '4', amountPerUnit: 0.25 }, { prepItemId: '3', amountPerUnit: 0.05 }] 
+    id: 'm2', name: 'Caesar Salad', productMix: 0.30, 
+    history7Days: [0.35, 0.32, 0.33, 0.28, 0.29, 0.30, 0.30],
+    ingredients: [{ prepItemId: '4', amountPerUnit: 1.0 }, { prepItemId: '3', amountPerUnit: 0.05 }] 
   },
   { 
-    id: 'm3', 
-    name: 'Garden Wrap', 
-    productMix: 0.25, 
-    ingredients: [{ prepItemId: '1', amountPerUnit: 0.02 }, { prepItemId: '4', amountPerUnit: 0.10 }] 
+    id: 'm3', name: 'Garden Wrap', productMix: 0.25, 
+    history7Days: [0.23, 0.24, 0.24, 0.26, 0.26, 0.23, 0.25],
+    ingredients: [{ prepItemId: '1', amountPerUnit: 0.02 }, { prepItemId: '4', amountPerUnit: 0.5 }] 
   }
 ];
 
@@ -38,13 +56,13 @@ export const INITIAL_INVENTORY: InventoryItem[] = [
 ];
 
 export const INITIAL_WASTE: WasteEntry[] = [
-  { id: 'w_1', itemName: 'Diced Onions', quantity: 1.2, unit: 'kg', reason: 'Expired', timestamp: '2023-10-22T22:00:00Z' },
+  { id: 'w_1', itemName: 'Diced Onions', quantity: 1.2, unit: 'kg', reason: 'OVERPREP', timestamp: '2023-10-22T22:00:00Z' },
 ];
 
 export const MOCK_FORECAST: ForecastData[] = [
-  { time: '08:00', actual: 120, predicted: 110 },
-  { time: '12:00', actual: 680, predicted: 650 },
-  { time: '18:00', actual: 0, predicted: 890 },
+  { time: '8:00 AM', actual: 120, predicted: 110 },
+  { time: '12:00 PM', actual: 680, predicted: 650 },
+  { time: '6:00 PM', actual: 0, predicted: 890 },
 ];
 
 export const MOCK_VELOCITY: VelocityMetric[] = [

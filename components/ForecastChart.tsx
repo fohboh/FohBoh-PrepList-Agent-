@@ -45,22 +45,32 @@ const ForecastChart: React.FC<ForecastChartProps> = ({ data }) => {
             tickFormatter={(value) => `$${value}`}
           />
           <Tooltip 
-            contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}}
+            contentStyle={{borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)'}}
+            formatter={(value: any, name: string) => [
+              name.includes('Sales') ? `$${value.toLocaleString()}` : value,
+              name
+            ]}
           />
-          <Legend iconType="circle" />
+          <Legend 
+            verticalAlign="top" 
+            align="right" 
+            height={36}
+            iconType="circle"
+            formatter={(value) => <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{value}</span>}
+          />
           <Area 
             type="monotone" 
             dataKey="actual" 
-            name="Actual Sales"
+            name="Actual Sales ($)"
             stroke="#4f46e5" 
-            strokeWidth={2}
+            strokeWidth={3}
             fillOpacity={1} 
             fill="url(#colorActual)" 
           />
           <Area 
             type="monotone" 
             dataKey="predicted" 
-            name="Forecasted Sales"
+            name="Forecasted Sales ($)"
             stroke="#94a3b8" 
             strokeWidth={2}
             strokeDasharray="5 5"

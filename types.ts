@@ -3,6 +3,7 @@ export interface PrepItem {
   id: string;
   name: string;
   category: 'Produce' | 'Protein' | 'Dairy' | 'Sauce' | 'Other';
+  station: 'Garde Manger' | 'Butchery' | 'Sauté' | 'Bar' | 'General Prep';
   unit: string;
   currentStock: number;
   forecastNeeded: number;
@@ -10,18 +11,26 @@ export interface PrepItem {
   status: 'Pending' | 'In-Progress' | 'Completed';
   priority: 'High' | 'Medium' | 'Low';
   assignedTo?: string;
+  dueBy: string; // e.g. "10:30 AM"
+  shelfLifeDays: number;
+  requiresKnifeSkills: number; // 1-10
+  costPerUnit: number;
+  whyExplanation?: string;
 }
 
 export interface MenuItem {
   id: string;
   name: string;
-  productMix: number; // Percentage (e.g. 0.35 for 35%)
+  productMix: number;
+  history7Days: number[];
   ingredients: { prepItemId: string; amountPerUnit: number }[];
 }
 
-export interface DaypartConfig {
+export interface SpecialEvent {
+  id: string;
   name: string;
-  projectedMeals: number;
+  coverIncrease: number; // e.g. 1.2 for 20% increase
+  menuFocus?: string;
 }
 
 export interface InventoryItem {
@@ -50,7 +59,7 @@ export interface ForecastData {
 
 export interface VelocityMetric {
   item: string;
-  velocity: number; // units per hour
+  velocity: number;
   trend: 'up' | 'down' | 'stable';
 }
 
@@ -58,4 +67,5 @@ export interface AIResponse {
   message: string;
   suggestions?: Partial<PrepItem>[];
   analysis?: string;
+  isAiSuggestion: boolean;
 }
