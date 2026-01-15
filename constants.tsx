@@ -60,9 +60,16 @@ export const INITIAL_WASTE: WasteEntry[] = [
 ];
 
 export const MOCK_FORECAST: ForecastData[] = [
-  { time: '8:00 AM', actual: 120, predicted: 110 },
-  { time: '12:00 PM', actual: 680, predicted: 650 },
-  { time: '6:00 PM', actual: 0, predicted: 890 },
+  { time: '7:00 AM', actual: 40, predicted: 45 },
+  { time: '9:00 AM', actual: 180, predicted: 160 },
+  { time: '11:00 AM', actual: 450, predicted: 420 },
+  { time: '1:00 PM', actual: 720, predicted: 700 },
+  { time: '3:00 PM', actual: 310, predicted: 350 },
+  { time: '5:00 PM', actual: 580, predicted: 600 },
+  { time: '7:00 PM', actual: 940, predicted: 910 },
+  { time: '9:00 PM', actual: 420, predicted: 480 },
+  { time: '11:00 PM', actual: 150, predicted: 200 },
+  { time: '12:00 AM', actual: 50, predicted: 80 },
 ];
 
 export const MOCK_VELOCITY: VelocityMetric[] = [

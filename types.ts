@@ -26,6 +26,11 @@ export interface MenuItem {
   ingredients: { prepItemId: string; amountPerUnit: number }[];
 }
 
+export interface DaypartConfig {
+  volume: number;
+  avgCheck: number;
+}
+
 export interface SpecialEvent {
   id: string;
   name: string;

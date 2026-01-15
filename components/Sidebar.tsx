@@ -10,11 +10,13 @@ interface SidebarProps {
 const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: <Icons.Dashboard /> },
+    { id: 'inputs', label: 'Daily Inputs', icon: <Icons.Search /> },
     { id: 'preplist', label: 'Prep List', icon: <Icons.ChefHat /> },
     { id: 'pmix', label: 'P-Mix Analysis', icon: <Icons.Trend /> },
     { id: 'inventory', label: 'Inventory', icon: <Icons.Inventory /> },
     { id: 'waste', label: 'Waste Tracking', icon: <Icons.Trash /> },
     { id: 'agent', label: 'Prep Agent', icon: <Icons.Bot /> },
+    { id: 'help', label: 'Help & FAQ', icon: <Icons.Info /> },
   ];
 
   return (
@@ -28,7 +30,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
         </h1>
       </div>
       
-      <nav className="flex-1 p-4 space-y-1">
+      <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
         {menuItems.map((item) => (
           <button
             key={item.id}
